@@ -1,0 +1,21 @@
+image: python:3.13-slim
+
+stages:
+  - test
+
+variables:
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
+
+cache:
+  paths:
+    - .cache/uv
+
+check:
+  stage: test
+  before_script:
+    - pip install --no-cache-dir uv==0.13.6
+    - uv sync --frozen
+  script:
+    - uv run ruff check src tests
+    - uv run ruff format --check src tests
+    - uv run pytest

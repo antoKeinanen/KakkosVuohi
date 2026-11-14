@@ -1,0 +1,44 @@
+services:
+  blakkisvuohi:
+    build: .
+    restart: always
+    env_file: .env
+    environment:
+      # inside the container the databases are on their own volumes, whatever .env says
+      DATABASE_PATH: /data/blakkisvuohi.sqlite3
+      KEY_DATABASE_PATH: /keys/keys.sqlite3
+    # The token and the master key come from files, not from the environment (where they would
+    # show up in `docker inspect`, /proc and crash reports). Create them with, for example:
+    #   mkdir -p secrets && chmod 700 secrets
+    #   printf %s "<token from BotFather>" > secrets/bot_token
+    #   python3 -c "import secrets; print(secrets.token_urlsafe(48), end='')" > secrets/secret_key
+    #   # the container runs as uid 10001 and compose keeps the host's ownership of the files:
+    #   sudo chown 10001:10001 secrets/* && sudo chmod 400 secrets/*
+    secrets:
+      - bot_token
+      - secret_key
+    volumes:
+      # Two volumes: the data is useless without the keys. Back up `data` if you must, NEVER
+      # `keys`. (See README, "Backups".)
+      - data:/data
+      - keys:/keys
+    # webhook mode only: publish the port behind your HTTPS reverse proxy
+    # ports:
+    #   - "127.0.0.1:8080:8080"
+    # hardening: the bot needs nothing but its own volumes and the network
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+secrets:
+  bot_token:
+    file: ./secrets/bot_token
+  secret_key:
+    file: ./secrets/secret_key
+
+volumes:
+  data:
+  keys:

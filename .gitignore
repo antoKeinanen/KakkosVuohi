@@ -1,0 +1,19 @@
+# secrets and data: never commit
+.env
+secrets/
+data/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
