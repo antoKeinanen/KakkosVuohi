@@ -31,7 +31,7 @@ COMMAND_DESCRIPTIONS = [
     S.commands.moro.cmd_description,
     S.commands.poistu.cmd_description,
     S.commands.promillet.cmd_description,
-    "/start - Bläkkisvuohi v4 -valikko",
+    "/start - KakkosVuohen valikko",
     S.commands.stats.cmd_description,
     S.commands.stats2.cmd_description,
     S.commands.terms.cmd_description,

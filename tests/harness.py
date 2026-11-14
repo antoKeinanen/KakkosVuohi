@@ -47,7 +47,7 @@ class FakeSession(BaseSession):
     async def make_request(self, bot: Bot, method: Any, timeout: Any = None) -> Any:  # noqa: ASYNC109
         self.requests.append(method)
         if isinstance(method, GetMe):
-            return User(id=42, is_bot=True, first_name="Bläkkisvuohi", username=BOT_USERNAME)
+            return User(id=42, is_bot=True, first_name="KakkosVuohi", username=BOT_USERNAME)
         if isinstance(method, (DeleteWebhook, AnswerCallbackQuery)):
             return True
         chat_id = getattr(method, "chat_id", None)

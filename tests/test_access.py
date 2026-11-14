@@ -1,10 +1,10 @@
 """Who may do what, and in which chats."""
 
+import pytest
 from aiogram.exceptions import TelegramForbiddenError
 from aiogram.methods import SendMessage
 from harness import BOT_USERNAME, make_harness
 
-from blakkisvuohi.announcements import ANNOUNCEMENTS
 from blakkisvuohi.middlewares import ThrottleMiddleware
 from blakkisvuohi.strings import S
 
@@ -105,23 +105,34 @@ async def test_messages_from_bots_are_ignored(h):
     assert h.new() == []
 
 
-async def test_new_users_do_not_get_old_announcements_but_existing_ones_get_new_ones_once(h):
+@pytest.fixture
+def announcements(monkeypatch):
+    """The real list is empty (a new project), so the delivery logic is tested with a sample."""
+    sample = ["Ensimmäinen ilmoitus", "Toinen ilmoitus", "Kolmas ilmoitus"]
+    for module in ("blakkisvuohi.middlewares", "blakkisvuohi.db.users"):
+        monkeypatch.setattr(f"{module}.ANNOUNCEMENTS", sample)
+    return sample
+
+
+async def test_new_users_do_not_get_old_announcements_but_existing_ones_get_new_ones_once(
+    h, announcements
+):
     await h.register()
     await h.say("/about")
     assert len(h.texts()) == 1  # no announcements
 
     await h.store.users.update_read_announcements(
-        await h.store.users.find(1), len(ANNOUNCEMENTS) - 2
+        await h.store.users.find(1), len(announcements) - 2
     )
     await h.say("/about")
     first, second = h.new()
     assert first.text.startswith("Ilmoituksia:")
-    assert ANNOUNCEMENTS[-2][:30] in first.text and ANNOUNCEMENTS[-1][:30] in first.text
+    assert announcements[-2] in first.text and announcements[-1] in first.text
     await h.say("/about")
     assert len(h.new()) == 1  # shown only once
 
 
-async def test_announcements_are_retried_when_they_could_not_be_delivered(h):
+async def test_announcements_are_retried_when_they_could_not_be_delivered(h, announcements):
     """In a group the user may never have started the bot, so the private message fails."""
     await h.register()
     await h.store.users.update_read_announcements(await h.store.users.find(1), 0)
@@ -136,7 +147,7 @@ async def test_announcements_are_retried_when_they_could_not_be_delivered(h):
     h.new()
     await h.say("/about")
     assert any(t.startswith("Ilmoituksia:") for t in h.texts())
-    assert (await h.store.users.find(1)).read_announcements == len(ANNOUNCEMENTS)
+    assert (await h.store.users.find(1)).read_announcements == len(announcements)
 
 
 async def test_flooding_is_throttled(store, tmp_path):

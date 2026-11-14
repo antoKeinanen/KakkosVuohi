@@ -74,7 +74,7 @@ _STRINGS = {
             "announcements": "Ilmoituksia:\n\n{announcements}",
             "unauthorized": "Ei käyttöoikeutta.",
             "user404": "Rekisteröidy ensiksi käyttämällä komentoa /tunnus.",
-            "help_text": "BläkkisVuohi auttaa sinua ja ystäviäsi seuraamaan rippauksesi (lue: promillejesi) tasoa. Aloita komennolla /start tai seuraa näitä ohjeita.\n\nLuo ensimmäiseksi tunnus komennolla /tunnus. Tunnuksen luomisen jälkeen voit alkaa kellottamaan juomia sisään komennolla /juoma. Annan sinulle arvioita rippauksesta komennolla /promillet. Minut voi myös lisätä ryhmään, jolloin kerron /promillet-komennolla kaikkien ryhmässä olevien rippitasot. Jokaisen ryhmäläisen täytyy kuitenkin sanoa ryhmässä /moro, jotta he pääsevät rippilistaukseen mukaan.",
+            "help_text": "KakkosVuohi korvaa BläkkisVuohen. Vanhan botin tunnukset ja tiedot eivät siirtyneet, joten luo uusi tunnus.\n\nKakkosVuohi auttaa sinua ja ystäviäsi seuraamaan rippauksesi (lue: promillejesi) tasoa. Aloita komennolla /start tai seuraa näitä ohjeita.\n\nLuo ensimmäiseksi tunnus komennolla /tunnus. Tunnuksen luomisen jälkeen voit alkaa kellottamaan juomia sisään komennolla /juoma. Annan sinulle arvioita rippauksesta komennolla /promillet. Minut voi myös lisätä ryhmään, jolloin kerron /promillet-komennolla kaikkien ryhmässä olevien rippitasot. Jokaisen ryhmäläisen täytyy kuitenkin sanoa ryhmässä /moro, jotta he pääsevät rippilistaukseen mukaan.",
             "cmd_list": "Komennot\n\n{cmd_list}",
             "use_only_in_private": "Käytä komentoa vain minun kanssa privaviestinä!",
             "use_only_in_chats": "Käytä komentoa vain chateissa!",
@@ -85,7 +85,7 @@ _STRINGS = {
         },
         "about": {
             "cmd_description": "/about - About the bot",
-            "text": "BläkkisVuohi is a bot currently developed and maintained by @ultsi. It's completely open source, free and licensed under GPLv3. Source code can be found at https://gitlab.com/ultsi-projects/blakkisvuohi. Terms of Service and Privacy Policy can be found by using the command /terms",
+            "text": "KakkosVuohi estimates blood alcohol concentration from the drinks you log. It is free, open source and licensed under GPLv3. The source code is at https://github.com/antoKeinanen/KakkosVuohi. It continues BläkkisVuohi (https://gitlab.com/ultsi-projects/blakkisvuohi). It is maintained by @klusteri. Use /terms for the Terms of Service. The privacy policy is in /start, Help, Yksityisyys.",
         },
         "admin_loglevel": {
             "cmd_description": "/loglevel &lt;system|commands|db&gt; &lt;debug|info|error&gt; - säädä logauksen määrää.",
@@ -112,10 +112,10 @@ _STRINGS = {
         },
         "start": {
             "on_select": "Veressäsi on {grams} grammaa alkoholia, joka vastaa {standard_drinks} annosta. Olet selvinpäin {hours}h {minutes}min päästä.{drink_list}",
-            "on_select_nonuser": "BläkkisVuohi auttaa sinua ja ystäviäsi seuraamaan rippauksesi (lue: promillejesi) tasoa. Luo ensimmäiseksi tunnus valitsemalla Luo tunnus. Tunnuksen luomisen jälkeen voit alkaa kellottamaan juomia sisään juomavalikosta. Annan sinulle arvioita rippauksesta promillejen muodossa. Minut voi myös lisätä ryhmään, jolloin kerron /promillet-komennolla kaikkien ryhmässä olevien rippitasot. Jokaisen ryhmäläisen täytyy kuitenkin sanoa ryhmässä /moro, jotta he pääsevät rippilistaukseen mukaan.",
+            "on_select_nonuser": "KakkosVuohi korvaa BläkkisVuohen. Vanhan botin tunnukset ja tiedot eivät siirtyneet, joten luo uusi tunnus.\n\nKakkosVuohi auttaa sinua ja ystäviäsi seuraamaan rippauksesi (lue: promillejesi) tasoa. Luo ensimmäiseksi tunnus valitsemalla Luo tunnus. Tunnuksen luomisen jälkeen voit alkaa kellottamaan juomia sisään juomavalikosta. Annan sinulle arvioita rippauksesta promillejen muodossa. Minut voi myös lisätä ryhmään, jolloin kerron /promillet-komennolla kaikkien ryhmässä olevien rippitasot. Jokaisen ryhmäläisen täytyy kuitenkin sanoa ryhmässä /moro, jotta he pääsevät rippilistaukseen mukaan.",
             "header_user": "🐐 <b>Bäää - {title}</b> 🐐\n\n<b>Nyt:</b> {permilles}‰ - <b>30min:</b> {permilles30Min}‰\n\n",
             "header_nonuser": "🐐 <b>Bäää - {title}</b> 🐐\n\n",
-            "header_title": "Bläkkisvuohi",
+            "header_title": "KakkosVuohi",
             "on_select_drinks3h": "\n\nViimeisen kolmen tunnin tapahtumat:\n{drinkList3h}",
             "juo": {
                 "button_text": "🥂 Juo",
@@ -200,7 +200,7 @@ _STRINGS = {
                 },
                 "poista": {
                     "button_text": "🗑 Poista tunnus",
-                    "on_select": "Olet poistamassa tunnuksesi. Hyväksymällä poistat kaiken sinuun liittyvän tiedon Bläkkisvuohen tietokannoista eikä sinua enää ole mahdollista listata missään listauksissa.\n\nOletko varma, että haluat poistaa tunnuksesi?",
+                    "on_select": "Olet poistamassa tunnuksesi. Hyväksymällä poistat kaiken sinuun liittyvän tiedon KakkosVuohen tietokannoista eikä sinua enää ole mahdollista listata missään listauksissa.\n\nOletko varma, että haluat poistaa tunnuksesi?",
                     "double_confirm": "Oletko aivan varma? Kaikki tietosi <b>poistetaan</b> jos klikkaat kyllä.",
                     "canceled": "Peruit tunnuksen poistamisen.",
                     "deleted": "Kaikki tietosi on nyt poistettu. Rippaa rauhassa.",
@@ -254,7 +254,7 @@ _STRINGS = {
                 "general": {
                     "button_text": "Yleistä",
                     "header_title": "Help: Yleistä",
-                    "on_select": "Bläkkisvuohi auttaa arvioimaan alkoholin määrää veressä eli promilleja. Botille tilastoidaan juomia sitä mukaa, kun niitä juodaan, ja botti laskee juoduista juomista promillet, palamisen huomioon ottaen. Lisäksi botin voi lisätä ryhmään ryhmätilastoja varten.\n\n<b>Käyttö</b>\n\nBotin käyttäminen on yksinkertaista. Juodut juomat tilastoidaan joko /juoma- tai /start- komentoja käyttäen ja botti laskee promillemäärän heti. Botin käyttö <b>vaatii tunnuksen</b> luomisen, jonka voi tehdä joko /tunnus- tai /start- komennoilla. Tunnus vaaditaan, jotta promillejen arviointi olisi mahdollisimman tarkkaa.",
+                    "on_select": "KakkosVuohi auttaa arvioimaan alkoholin määrää veressä eli promilleja. Botille tilastoidaan juomia sitä mukaa, kun niitä juodaan, ja botti laskee juoduista juomista promillet, palamisen huomioon ottaen. Lisäksi botin voi lisätä ryhmään ryhmätilastoja varten.\n\n<b>Käyttö</b>\n\nBotin käyttäminen on yksinkertaista. Juodut juomat tilastoidaan joko /juoma- tai /start- komentoja käyttäen ja botti laskee promillemäärän heti. Botin käyttö <b>vaatii tunnuksen</b> luomisen, jonka voi tehdä joko /tunnus- tai /start- komennoilla. Tunnus vaaditaan, jotta promillejen arviointi olisi mahdollisimman tarkkaa.",
                 },
                 "faq": {
                     "button_text": "FAQ",
@@ -263,23 +263,23 @@ _STRINGS = {
                     "juominen": {
                         "button_text": "Juominen",
                         "header_title": "FAQ: Juominen",
-                        "on_select": "<b>Kannattaako juoma merkata avatessa vai viimeistellessä?</b>\nJuomat kannattaa merkata silloin, kun ne avaa. Promillearvioinnissa oletetaan juoman imeytyvän 99-prosenttisesti 30 minuutissa. Lisäksi avatessa juoman muistaa merkata paremmin.\n\n<b>Kuinka tarkka promillejen arviointi on?</b>\nNoin 1.5‰ asti hyvin tarkka - tätä pidemmälle menneitä tutkimuksia ei ole tehty (jos on, laita viestiä @ultsi), joten laskukaava alkaa heittämään 1.5‰ jälkeen. Botin arviot ovat myös linjassa mm. lintukoto.net -laskurin kanssa.\n\n<b>Unohdin lisätä juomat, mitä nyt?</b>\nKäytä /jalkikellotus-komentoa, tai /start-valikosta löytyvää Jälkikellotus-nappulaa.",
+                        "on_select": "<b>Kannattaako juoma merkata avatessa vai viimeistellessä?</b>\nJuomat kannattaa merkata silloin, kun ne avaa. Promillearvioinnissa oletetaan juoman imeytyvän 99-prosenttisesti 30 minuutissa. Lisäksi avatessa juoman muistaa merkata paremmin.\n\n<b>Kuinka tarkka promillejen arviointi on?</b>\nNoin 1.5‰ asti hyvin tarkka - tätä pidemmälle menneitä tutkimuksia ei ole tehty (jos on, laita viestiä @klusteri), joten laskukaava alkaa heittämään 1.5‰ jälkeen. Botin arviot ovat myös linjassa mm. lintukoto.net -laskurin kanssa.\n\n<b>Unohdin lisätä juomat, mitä nyt?</b>\nKäytä /jalkikellotus-komentoa, tai /start-valikosta löytyvää Jälkikellotus-nappulaa.",
                     },
                     "ryhmat": {
                         "button_text": "Ryhmät",
                         "header_title": "FAQ: Ryhmät",
-                        "on_select": '<b>Miten voin liittyä ryhmään tai poistua ryhmästä?</b>\nKirjoita /moro, jos haluat liittyä ryhmään. Kirjoita /poistu, jos haluat poistua ryhmästä. Ryhmään liittyneenä sinun promilletasosi näkyy esim. /promillet-komennolla.\n\n<b>Miksi /kuvaaja -kuvassa kaikkien promillet laskee samaa tahtia?</b>\nPromillet kuvaavat alkoholin osuutta koko kehon verestä. Alkoholi palaa elimistössä nopeammin painavammilla ihmisillä, mutta veren määrä kehossa on tällöin myös suhteessa noin saman verran korkeampi. Tällöin promillejen väheneminen kehossa on kaikilla ihmisillä jotakuinkin sama.\n\n<b>Tallentaako Bläkkisvuohi ryhmän viestit?</b>\n<b>Ei tallenna.</b> Jos menet ryhmän käyttäjälistaukseen, Bläkkisvuohen kohdalla lukee "No access to messages", joka tarkoittaa, ettei Bläkkisvuohi voi millään tavalla lukea muita viestejä kuin komentoja.',
+                        "on_select": '<b>Miten voin liittyä ryhmään tai poistua ryhmästä?</b>\nKirjoita /moro, jos haluat liittyä ryhmään. Kirjoita /poistu, jos haluat poistua ryhmästä. Ryhmään liittyneenä sinun promilletasosi näkyy esim. /promillet-komennolla.\n\n<b>Miksi /kuvaaja -kuvassa kaikkien promillet laskee samaa tahtia?</b>\nPromillet kuvaavat alkoholin osuutta koko kehon verestä. Alkoholi palaa elimistössä nopeammin painavammilla ihmisillä, mutta veren määrä kehossa on tällöin myös suhteessa noin saman verran korkeampi. Tällöin promillejen väheneminen kehossa on kaikilla ihmisillä jotakuinkin sama.\n\n<b>Tallentaako KakkosVuohi ryhmän viestit?</b>\n<b>Ei tallenna.</b> Jos menet ryhmän käyttäjälistaukseen, KakkosVuohen kohdalla lukee "No access to messages", joka tarkoittaa, ettei KakkosVuohi voi millään tavalla lukea muita viestejä kuin komentoja.',
                     },
                     "koodi": {
                         "button_text": "Koodi",
                         "header_title": "FAQ: Koodi",
-                        "on_select": "<b>Miten Bläkkisvuohi on koodattu?</b>\nLyhyesti: Python-kielellä aiogram-kirjastoa käyttäen, ja tietokantana toimii SQLite. Pitkästi: katso koko koodi osoitteesta https://gitlab.com/ultsi-projects/blakkisvuohi.\n\n<b>Keksin uuden ominaisuuden, minne voin ilmoittaa siitä?</b>\nTällä hetkellä kehittäjänä toimii @ultsi, jolle voi laittaa suoraan privaviestiä. Issuen lisääminen gitlabiin toimii kanssa. https://gitlab.com/ultsi-projects/blakkisvuohi/-/issues\n\n",
+                        "on_select": "<b>Miten KakkosVuohi on koodattu?</b>\nLyhyesti: Python-kielellä aiogram-kirjastoa käyttäen, ja tietokantana toimii SQLite. Koko koodi on osoitteessa https://github.com/antoKeinanen/KakkosVuohi.\n\n<b>Keksin uuden ominaisuuden, minne voin ilmoittaa siitä?</b>\nLaita viestiä @klusteri tai avaa issue GitHubissa: https://github.com/antoKeinanen/KakkosVuohi/issues\n\n",
                     },
                 },
                 "privacy": {
                     "button_text": "Yksityisyys",
                     "header_title": "Help: Yksityisyys",
-                    "on_select": "Sinun yksityisyys on turvattu Bläkkisvuohen kehittäjien toimesta mahdollisimman hyvin. Tässä muutama kohta yksityisyydestä:\n\n<b>Mitä tietoja kerätään?</b>\nBläkkisvuohen käyttö edellyttää seuraavien tietojen keräämistä:\n- Telegramiin määritelty nimimerkki tai nimi\n- Salaisella avaimella laskettu tiiviste (HMAC) Telegram-tilisi tunnisteesta (userId)\n- Paino ja pituus (tallennetaan pyöristettynä lähimpään viiteen)\n- Sukupuoli\n- Merkattujen juomien alkoholipitoisuudet, nimet ja juomisajat\n- Salaisella avaimella lasketut tiivisteet (HMAC) liityttyjen ryhmien tunnisteista (groupId)\n- Päivä, jona viimeksi käytit Bläkkisvuohea\n\n<b>Kuinka kauan tietoja säilytetään?</b>\nJuomat poistetaan automaattisesti {retention_days} päivän jälkeen, ja tunnus kaikkine tietoineen poistetaan, jos et käytä Bläkkisvuohea {account_days} päivään. Siivous tehdään joka päivä.\n\n<b>Missä ja miten tietoja säilötään?</b>\nTietoja säilytetään virtuaalipalvelimella Euroopassa, ja vain Bläkkisvuohen ylläpitäjillä on sinne pääsy. Kaikki sinuun liittyvät tiedot (nimimerkki, mitat, juomat) on salattu tietokannassa (AES-256-GCM) omalla avaimellasi, ja avaimet säilytetään erillään tiedoista. Tunnuksen poistaminen tuhoaa avaimesi, jolloin tiedot eivät ole luettavissa enää mistään. Voit ladata kaikki tietosi komennolla /data ja poistaa ne asetuksista.\n\n<b>Minulla on lisäkysymyksiä yksityisyyteen liittyen!</b>\nOnnistuu, ota yhteyttä @ultsi.",
+                    "on_select": "Tässä kerrotaan, mitä tietoja KakkosVuohi tallentaa ja miten niitä suojataan.\n\n<b>Mitä tietoja kerätään?</b>\nKakkosVuohen käyttö edellyttää seuraavien tietojen keräämistä:\n- Telegramiin määritelty nimimerkki tai nimi\n- Salaisella avaimella laskettu tiiviste (HMAC) Telegram-tilisi tunnisteesta (userId)\n- Paino ja pituus (tallennetaan pyöristettynä lähimpään viiteen)\n- Sukupuoli\n- Merkattujen juomien alkoholipitoisuudet, nimet ja juomisajat\n- Salaisella avaimella lasketut tiivisteet (HMAC) liityttyjen ryhmien tunnisteista (groupId)\n- Päivä, jona viimeksi käytit KakkosVuohta\n\n<b>Kuinka kauan tietoja säilytetään?</b>\nJuomat poistetaan automaattisesti {retention_days} päivän jälkeen, ja tunnus kaikkine tietoineen poistetaan, jos et käytä KakkosVuohta {account_days} päivään. Siivous tehdään joka päivä.\n\n<b>Missä ja miten tietoja säilötään?</b>\nTietoja säilytetään botin ylläpitäjän palvelimella, ja vain ylläpitäjällä on sinne pääsy. Kaikki sinuun liittyvät tiedot (nimimerkki, mitat, juomat) on salattu tietokannassa (AES-256-GCM) omalla avaimellasi, ja avaimet säilytetään erillään tiedoista. Tunnuksen poistaminen tuhoaa avaimesi, jolloin tiedot eivät ole luettavissa enää mistään. Voit ladata kaikki tietosi komennolla /data ja poistaa ne asetuksista.\n\n<b>Minulla on lisäkysymyksiä yksityisyyteen liittyen!</b>\nOta yhteyttä @klusteri.",
                 },
             },
         },
@@ -345,18 +345,18 @@ _STRINGS = {
             "text_group_list_item": "{username}... {permilles} ({drinks12h}/{drinks24h})",
         },
         "stats": {
-            "cmd_description": "/stats - listaa ryhmän tai sinun kulutustilastoja. Lisäämällä numeron komennon perään voit valita, kuinka monelta päivältä taaksepäin haluat tilastot",
+            "cmd_description": "/stats - listaa ryhmän tai sinun kulutustilastoja. Lisäämällä numeron komennon perään voit valita, kuinka monelta päivältä taaksepäin haluat tilastot. Tilastot kattavat enintään tietojen säilytysajan",
             "private": "Olet {day_count} päivän aikana tuhonnut {grams} grammaa alkoholia, joka vastaa {standard_drinks} annosta. Keskimäärin olet juonut {avg_standard_drinks} annosta per päivä.",
             "group": "Tilastoja:\n\nRyhmän jäsenet ovat {day_count} päivän aikana tuhonneet {grams} grammaa alkoholia, joka vastaa {standard_drinks} annosta. Keskimäärin on juotu {avg_standard_drinks} annosta per päivä. Lisäksi kaikki käyttäjät globaalisti ovat yhteensä tilastoineet {global_drinks_count} juomaa. Hienosti.\n\nTop10 tilastot <b>juomina</b>:\n\n{top10List}",
         },
         "stats2": {
-            "cmd_description": "/stats2 - listaa ryhmän tai sinun kulutustilastoja annoksittain. Lisäämällä numeron komennon perään voit valita, kuinka monelta päivältä taaksepäin haluat tilastot",
+            "cmd_description": "/stats2 - listaa ryhmän tai sinun kulutustilastoja annoksittain. Lisäämällä numeron komennon perään voit valita, kuinka monelta päivältä taaksepäin haluat tilastot. Tilastot kattavat enintään tietojen säilytysajan",
             "private": "Olet {day_count} päivän aikana tuhonnut {grams} grammaa alkoholia, joka vastaa {standard_drinks} annosta. Keskimäärin olet juonut {avg_standard_drinks} annosta per päivä.",
             "group": "Tilastoja:\n\nRyhmän jäsenet ovat {day_count} päivän aikana tuhonneet {grams} grammaa alkoholia, joka vastaa {standard_drinks} annosta. Keskimäärin on juotu {avg_standard_drinks} annosta per päivä. Lisäksi kaikki käyttäjät globaalisti ovat yhteensä tilastoineet {global_drinks_std} annosta. Hienosti.\n\nTop10 tilastot <b>annoksina</b>:\n\n{top10List}",
         },
         "terms": {
             "cmd_description": "/terms - Terms of Service",
-            "reply": "<b>Käyttöehdot</b>\n\nKäyttämällä Bläkkisvuohea olet hyväksynyt seuraavat käyttöehdot. Bläkkisvuohen päätarkoitus on arvioida alkoholin määrää kehossa. Bläkkisvuohen toiminta voi muuttua tai pysähtyä milloin vain. Sinun täytyy olla yli 18 vuotta käyttääksesi Bläkkisvuohea. Bläkkisvuohen kehittäjät tai ylläpitäjät eivät ole vastuussa mistään suorasta tai epäsuorasta haitasta, jota palvelun käyttäminen voi aiheuttaa. Bläkkisvuohi on ilmainen käyttää. Ominaisuuksien, kuten promillejen arvioiminen, takia Bläkkisvuohi tallentaa käyttäjistä erinäisiä tietoja ja käyttää näitä hyväksi laskennassa. Sinuun suoraan linkitettävät tiedot salataan ennen tallentamista. Tietoja ei koskaan anneta tai myydä eteenpäin kolmansille osapuolille. Tallennetut tiedot voidaan poistaa pyynnöstä.\n\nBläkkisvuohen tuottamat arviot ovat arvioita, eikä niihin voi missään tapauksessa täysin luottaa. Noudata lakia, kun käytät alkoholia.\n\nNämä käyttöehdot voivat muuttua milloin vain ilman erillistä huomautusta. Uusimmat käyttöehdot voi aina lukea /terms-komennolla. Nämä käyttöehdot ovat voimassa 10.01.2018 lähtien.",
+            "reply": "<b>Käyttöehdot</b>\n\nKäyttämällä KakkosVuohta olet hyväksynyt seuraavat käyttöehdot. KakkosVuohen päätarkoitus on arvioida alkoholin määrää kehossa. KakkosVuohen toiminta voi muuttua tai pysähtyä milloin vain. Sinun täytyy olla yli 18 vuotta käyttääksesi KakkosVuohta. KakkosVuohen kehittäjät tai ylläpitäjät eivät ole vastuussa mistään suorasta tai epäsuorasta haitasta, jota palvelun käyttäminen voi aiheuttaa. KakkosVuohi on ilmainen käyttää. Ominaisuuksien, kuten promillejen arvioiminen, takia KakkosVuohi tallentaa käyttäjistä erinäisiä tietoja ja käyttää näitä hyväksi laskennassa. Sinuun suoraan linkitettävät tiedot salataan ennen tallentamista. Tietoja ei koskaan anneta tai myydä eteenpäin kolmansille osapuolille. Tiedot poistetaan automaattisesti määräajan jälkeen (katso /start, Help, Yksityisyys), ja voit poistaa ne itse milloin vain asetuksista.\n\nKakkosVuohen tuottamat arviot ovat arvioita, eikä niihin voi missään tapauksessa täysin luottaa. Noudata lakia, kun käytät alkoholia.\n\nNämä käyttöehdot voivat muuttua milloin vain ilman erillistä huomautusta. Uusimmat käyttöehdot voi aina lukea /terms-komennolla. Nämä käyttöehdot ovat voimassa 14.11.2026 lähtien.",
         },
         "tunnus": {
             "cmd_description": "/tunnus - Luo itsellesi uusi tunnus tai muokkaa tunnustasi.",

@@ -121,7 +121,7 @@ async def run(settings: Settings) -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = build_dispatcher(store, settings)
-    log.info("BläkkisVuohi %s started in %s mode", __version__, settings.bot_mode)
+    log.info("KakkosVuohi %s started in %s mode", __version__, settings.bot_mode)
     purge = asyncio.create_task(
         purge_forever(store, settings.purge_hour, settings.tzinfo), name="purge"
     )

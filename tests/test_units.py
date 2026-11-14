@@ -1,14 +1,12 @@
 import json
 import re
 from datetime import UTC
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import ValidationError
 
 from blakkisvuohi import constants
-from blakkisvuohi.announcements import ANNOUNCEMENTS
 from blakkisvuohi.config import Settings
 from blakkisvuohi.csvexport import to_csv
 from blakkisvuohi.drinkinput import DrinkInputError, milligrams
@@ -201,11 +199,6 @@ def test_csv_does_not_touch_numbers():
 
 
 # -- data that was ported from the previous version -----------------------------------------------
-
-
-def test_announcements_are_identical_to_the_previous_version():
-    old = json.loads((Path(__file__).parent / "golden_announcements.json").read_text())
-    assert ANNOUNCEMENTS == old
 
 
 def test_all_strings_are_valid_telegram_html():

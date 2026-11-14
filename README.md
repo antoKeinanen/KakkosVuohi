@@ -1,12 +1,10 @@
-# BläkkisVuohi
+# KakkosVuohi
 
-A Telegram bot designed to help monitor current EBAC level. Has group functionality to list all users' EBAC in permilles or Finnish standard drinks (12.0 grams). Try it out at [https://t.me/blakkisvuohibot](https://t.me/blakkisvuohibot)!
+A Telegram bot that estimates the blood alcohol concentration (EBAC) of its users from the drinks they log. In groups it lists every member's EBAC in permilles or in Finnish standard drinks (12.0 grams). The bot's texts are in Finnish. Try it at [@kakkos_vuohi_bot](https://t.me/kakkos_vuohi_bot).
 
-Version 5 is a rewrite of the bot in **Python 3.11+** with [aiogram 3](https://docs.aiogram.dev/) and **SQLite**. The commands, texts and the alcohol math are the same as in the Node.js version (4.x); what changed is the stack and, above all, how little personal data is kept and how it is protected.
+KakkosVuohi replaces BläkkisVuohi (`@blakkisvuohibot`, [source](https://gitlab.com/ultsi-projects/blakkisvuohi)), the earlier Node.js bot, which has been shut down. It is a rewrite in **Python 3.11+** with [aiogram 3](https://docs.aiogram.dev/) and **SQLite**. The commands, the texts and the alcohol math are the same as in BläkkisVuohi 4.x. The stack changed, and so did how much personal data the bot keeps and how it protects it.
 
-Thanks Yago for the excellent [Telegram Bot API framework for NodeJS](https://github.com/yagop/node-telegram-bot-api) that the earlier versions were built on.
-
-This project is supported by the awesome [Futurice Open Source and Social Impact program](https://spiceprogram.org/).
+Thanks Yago for the [Telegram Bot API framework for NodeJS](https://github.com/yagop/node-telegram-bot-api) that the earlier versions were built on.
 
 ## Running it
 
@@ -71,7 +69,7 @@ The bot keeps little personal data (a nickname, weight, height, gender, the drin
 
 ### 2. Everything that remains is encrypted, per user
 
-* Telegram user and chat ids are stored as an **HMAC-SHA-256** under `SECRET_KEY` (the old version used an unsalted SHA-256 that could be brute forced, because Telegram ids are small numbers).
+* Telegram user and chat ids are stored as an **HMAC-SHA-256** under `SECRET_KEY` (BläkkisVuohi used an unsalted SHA-256 that could be brute forced, because Telegram ids are small numbers).
 * The nickname, body data and **all drinks of a user are encrypted with AES-256-GCM under that user's own random key**. Each ciphertext is bound to its owner and purpose, so it cannot be moved between users or reused as another kind of data, and is padded to a fixed block size so that its length does not reveal how many drinks someone has.
 * The per-user keys are stored **wrapped** (encrypted) under a master key derived from `SECRET_KEY`, **in a different database file** than the data.
 * Deleting an account destroys the key first. From that moment the data is unreadable, **also in any copy of the data database** (a backup, a stolen file) - "crypto-shredding".
@@ -93,7 +91,7 @@ No scheme can protect data from an attacker who controls the running process, wh
 
 ### Other protections
 
-| Before (v4) | Now |
+| BläkkisVuohi 4 | KakkosVuohi |
 |---|---|
 | Webhook secret was the bot token in the URL | Unguessable path **and** Telegram's secret-token header, checked in constant time; no access log; no version disclosure |
 | Texts were sent as Markdown with nicknames and chat titles pasted in (formatting injection, broken messages) | HTML parse mode, **every user-controlled value is escaped** |
@@ -160,7 +158,7 @@ Because everything personal is encrypted, there is no SQL over the data: group l
 
 To change the database schema, **append** a migration to `DATA_MIGRATIONS` / `KEY_MIGRATIONS` in `db/database.py`; never edit one that has been released. New announcements go to the end of the list in `announcements.py`.
 
-## Differences from version 4
+## Differences from BläkkisVuohi 4
 
 Nothing was removed. Things that changed on purpose:
 
@@ -173,6 +171,6 @@ Nothing was removed. Things that changed on purpose:
 * Notifications of new announcements are retried until they were really delivered (in a group the user may never have opened the bot).
 * `/juoma` "Oma": the prompt for the percentage removes the keyboard.
 
-## Moving data from version 4
+## Data from BläkkisVuohi
 
-There is no importer, and with a one week retention there would be little to import. Users can fetch their data with `/data` in the old bot.
+KakkosVuohi starts with an empty database and has no importer. With a one week retention there would be little to import.

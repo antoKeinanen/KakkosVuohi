@@ -28,7 +28,7 @@ async def press(h, button, user=1):
 
 async def test_menu_of_somebody_without_an_account(h):
     sent = await open_menu(h)
-    assert sent.text.startswith("🐐 <b>Bäää - Bläkkisvuohi</b> 🐐")
+    assert sent.text.startswith("🐐 <b>Bäää - KakkosVuohi</b> 🐐")
     assert ST.on_select_nonuser in sent.text
     assert sent.button_rows() == [[LUO.button_text, ST.help.button_text]]
 
