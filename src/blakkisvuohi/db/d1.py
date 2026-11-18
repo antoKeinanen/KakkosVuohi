@@ -145,21 +145,36 @@ class D1Database:
 
     async def _migrate(self) -> None:
         await self._client.batch([(sql, ()) for sql in _SETUP])
-        row = await self._fetchone("SELECT schema_version FROM _d1_state WHERE id = 1")
-        version = int(row[0]) if row else 0
-        if version > len(self._migrations):
-            raise RuntimeError(
-                f"Database schema version {version} is newer than this bot supports "
-                f"({len(self._migrations)}). Refusing to start."
-            )
-        for number, script in enumerate(self._migrations[version:], start=version + 1):
+        while True:
+            row = await self._fetchone("SELECT schema_version FROM _d1_state WHERE id = 1")
+            version = int(row[0]) if row else 0
+            if version > len(self._migrations):
+                raise RuntimeError(
+                    f"Database schema version {version} is newer than this bot supports "
+                    f"({len(self._migrations)}). Refusing to start."
+                )
+            if version == len(self._migrations):
+                return
+            number = version + 1
             log.info("Applying database migration %d", number)
-            # A batch is atomic, and the version is set first: should two isolates migrate at
-            # once, the trigger aborts the second one before any of its statements ran.
-            await self._client.batch(
-                [("UPDATE _d1_state SET schema_version = ? WHERE id = 1", (number,)), _BUMP]
-                + [(sql, ()) for sql in _statements(script)]
-            )
+            try:
+                # A batch is atomic, and the version is set first: should two isolates migrate
+                # at once, the trigger aborts the second one before any of its statements ran.
+                await self._client.batch(
+                    [("UPDATE _d1_state SET schema_version = ? WHERE id = 1", (number,)), _BUMP]
+                    + [(sql, ()) for sql in _statements(self._migrations[version])]
+                )
+            except Exception as exc:
+                if _MIGRATED not in str(exc):
+                    raise
+                log.info("Migration %d was applied meanwhile by another isolate", number)
+
+    async def setup(self, statements: Sequence[str]) -> None:
+        """
+        Idempotent DDL (CREATE ... IF NOT EXISTS) of the tables only the Worker uses. Not a
+        migration: the SQLite databases of the long running bot do not get these tables.
+        """
+        await self._client.batch([(sql, ()) for sql in statements])
 
     async def close(self) -> None:
         """Nothing to close: the binding belongs to the Worker."""

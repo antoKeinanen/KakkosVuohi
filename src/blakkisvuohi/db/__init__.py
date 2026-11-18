@@ -38,7 +38,7 @@ class Store:
         self.keydb = keydb
         self.crypto = crypto
         self.policy = policy
-        self.vault = Vault(keydb, crypto)
+        self.vault = Vault(keydb, crypto, clock)
         self.users = UserRepository(db, self.vault, crypto, clock, policy)
         self.drinks = DrinkRepository(db, self.vault, clock, policy)
         self.groups = GroupRepository(db, crypto, self.users, clock)

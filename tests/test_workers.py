@@ -15,6 +15,7 @@ from conftest import SECRET, Clock, open_d1_store
 from fake_d1 import SqliteD1
 from harness import FakeSession, make_settings
 
+from blakkisvuohi import conversations
 from blakkisvuohi.conversations import DatabaseStorage
 from blakkisvuohi.db import D1Database, TransactionConflict
 from blakkisvuohi.db.database import DATA_MIGRATIONS
@@ -159,6 +160,7 @@ async def test_conversations_are_stored_sealed_and_pseudonymous(tmp_path, crypto
 
 async def test_conversations_of_users_are_shredded_with_their_account(store, crypto, clock):
     """Once a user has an account, their state is sealed with their key, not with SECRET_KEY."""
+    await store.db.setup([conversations.TABLE])  # the Worker's table (also on SQLite here)
     storage = DatabaseStorage(store.db, store.vault, crypto, clock)
     key = _key(user=5, chat=5)
 
@@ -179,14 +181,36 @@ async def test_conversations_of_users_are_shredded_with_their_account(store, cry
     assert await storage.get_data(key) == {}  # gone with the key, whatever copies remain
 
 
-async def test_the_purge_ends_conversations_that_stopped(store, crypto, clock):
+async def test_state_of_an_account_deleted_meanwhile_is_not_sealed_again(store, crypto, clock):
+    """The purge deletes the account between reading and writing the state: drop the state."""
+    await store.db.setup([conversations.TABLE])
+    storage = DatabaseStorage(store.db, store.vault, crypto, clock)
+    key = _key(user=5, chat=5)
+    user, _ = await store.users.create_or_update(5, "Anto", 87, "mies", 180)
+    await storage.update_data(key, {"juo_last2_drinks": ["Kalja 0.33"]})
+
+    read = storage._read
+
+    async def delete_after_reading(k):
+        result = await read(k)
+        await store.users.delete(user)
+        return result
+
+    storage._read = delete_after_reading
+    await storage.update_data(key, {"more": 1})
+    storage._read = read
+    assert await store.db.fetchone("SELECT 1 FROM conversations") is None
+
+
+async def test_stopped_conversations_end_after_the_daily_purge(store, crypto, clock):
+    await store.db.setup([conversations.TABLE])
     storage = DatabaseStorage(store.db, store.vault, crypto, clock)
     await storage.set_state(_key(user=1), "old")
     clock.advance(hours=24)
     await storage.set_state(_key(user=2), "yesterday")
     clock.advance(hours=24)
     await storage.set_state(_key(user=3), "today")
-    await store.purge()
+    await conversations.end_stopped(store.db, clock())
     assert [await storage.get_state(_key(user=u)) for u in (1, 2, 3)] == [
         None,
         "yesterday",
@@ -350,26 +374,66 @@ async def test_an_update_is_handled_at_most_once(tmp_path):
     good = {runtime.SECRET_HEADER: WEBHOOK_SECRET}
     rt, session = await build_runtime(tmp_path)
     await rt.store.users.create_or_update(5, "Anto", 80, "mies", 180)
+    user = await rt.store.users.find(5)
     clock = Clock()
 
-    async def post(update_id: int) -> int:
+    async def post(rt: runtime.Runtime, update_id: int) -> None:
         update = message_update(update_id, "/kalja033")
-        return (await runtime.handle_request(rt, "POST", rt.webhook_path, good, update, "", clock))[
-            0
-        ]
+        result = await runtime.handle_request(rt, "POST", rt.webhook_path, good, update, "", clock)
+        assert result == (200, "{}")
 
-    assert await post(100) == 200
-    rt, session = await build_runtime(tmp_path)  # sent again, to another isolate
-    assert await post(100) == 200
-    assert await post(99) == 200  # an older one
+    await post(rt, 100)
+    other, session = await build_runtime(tmp_path)  # sent again, to another isolate
+    await post(other, 100)
     assert session.requests == []
-    user = await rt.store.users.find(5)
     assert len(await rt.store.drinks.since(user, 24)) == 1
 
-    # after a week without updates Telegram starts from a random number
-    clock.advance(hours=24 * 7)
-    assert await post(7) == 200
-    assert len(await rt.store.drinks.since(user, 24 * 8)) == 2
+    await post(other, 99)  # an earlier update that arrives late is not lost
+    assert len(await rt.store.drinks.since(user, 24)) == 2
+
+    # the ids are forgotten once Telegram has given up on them
+    clock.advance(hours=49)
+    await runtime.clean_up(rt, clock())
+    assert await rt.store.db.fetchall("SELECT * FROM handled_updates") == []
+
+
+async def test_updates_of_another_bot_on_the_same_database_are_not_skipped(tmp_path):
+    good = {runtime.SECRET_HEADER: WEBHOOK_SECRET}
+    rt, _ = await build_runtime(tmp_path)
+    update = message_update(1, "/tunnus")
+    await runtime.handle_request(rt, "POST", rt.webhook_path, good, update, "")
+    session = FakeSession()
+    other = await runtime.build(
+        runtime.settings_from(worker_env(BOT_TOKEN="43:OTHER")),
+        SqliteD1(str(tmp_path / "data.sqlite3")),
+        SqliteD1(str(tmp_path / "keys.sqlite3")),
+        session,
+    )
+    await runtime.handle_request(other, "POST", other.webhook_path, good, update, "")
+    assert len(session.requests) == 1
+
+
+def test_a_bad_configuration_does_not_leak_secrets_into_the_logs():
+    with pytest.raises(ValueError, match="SECRET_KEY") as raised:
+        runtime.settings_from(worker_env(SECRET_KEY="short-but-secret-value"))
+    assert "short-but-secret-value" not in str(raised.value)
+    assert raised.value.__cause__ is None and raised.value.__suppress_context__
+
+
+async def test_an_isolate_that_lost_the_race_to_migrate_carries_on(tmp_path):
+    from blakkisvuohi.db.d1 import Row
+
+    await open_d1(tmp_path)  # another isolate migrated
+    late = D1Database(SqliteD1(str(tmp_path / "data.sqlite3")), DATA_MIGRATIONS)
+    fetch = late._fetchone
+    stale = [Row({"schema_version": 0}, [0])]  # what this one read just before
+
+    async def stale_once(sql, params=()):
+        return stale.pop() if stale and "schema_version" in sql else await fetch(sql, params)
+
+    late._fetchone = stale_once
+    await late._migrate()  # no error
+    assert not stale
 
 
 async def test_the_privacy_notice_says_where_the_data_is(store, tmp_path):

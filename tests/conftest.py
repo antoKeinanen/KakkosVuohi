@@ -36,7 +36,11 @@ async def open_d1_store(tmp_path, crypto, clock, policy=None) -> Store:
     """A store on D1 (faked with SQLite files of the same names as the SQLite store's)."""
     from fake_d1 import SqliteD1
 
+    from blakkisvuohi import conversations
+    from blakkisvuohi.workers.runtime import UPDATES_TABLE
+
     db = await D1Database.open(SqliteD1(str(tmp_path / "data.sqlite3")), DATA_MIGRATIONS)
+    await db.setup([conversations.TABLE, UPDATES_TABLE])  # as the Worker does
     keydb = await D1Database.open(SqliteD1(str(tmp_path / "keys.sqlite3")), KEY_MIGRATIONS)
     return await Store.from_databases(db, keydb, crypto, clock, policy)
 

@@ -7,7 +7,7 @@ Telegram is told to send one update at a time (max_connections=1), so that updat
 order, as in the long running bot. A request returns when its update has been handled. An update
 is handled at most once: Telegram sends it again if the Worker failed (or was too slow), and a
 second /kalja033 must not record a second drink, nor must an update that crashes the Worker block
-all the others.
+all the others. Handled update ids are kept for two days: Telegram gives up on an update after one.
 """
 
 from __future__ import annotations
@@ -25,10 +25,11 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.base import BaseSession
 from aiogram.enums import ParseMode
+from pydantic import ValidationError
 
+from .. import conversations
 from ..app import ALLOWED_UPDATES, build_dispatcher, configure_logging
 from ..config import Settings
-from ..conversations import DatabaseStorage
 from ..db import D1Database, RetentionPolicy, Store
 from ..db.d1 import D1Client
 from ..db.database import DATA_MIGRATIONS, KEY_MIGRATIONS
@@ -39,8 +40,14 @@ log = logging.getLogger("blakkis.system")
 
 SECRET_HEADER = "x-telegram-bot-api-secret-token"  # noqa: S105 - a header name
 
-# Telegram numbers updates in order, but picks a random number after a week without updates
-REPEAT_WINDOW = 6 * 24 * 3600
+# The update ids already handled, by bot (another bot may share the database)
+UPDATES_TABLE = """
+CREATE TABLE IF NOT EXISTS handled_updates (
+    id TEXT PRIMARY KEY,
+    at INTEGER NOT NULL
+) STRICT
+"""
+KEEP_UPDATES = 2 * 24 * 3600
 
 
 def settings_from(env: Mapping[str, Any]) -> Settings:
@@ -51,7 +58,16 @@ def settings_from(env: Mapping[str, Any]) -> Settings:
         if env.get(name.upper()) not in (None, "")
     }
     values["bot_mode"] = "worker"
-    return Settings(_env_file=None, _secrets_dir=None, **values)  # type: ignore[call-arg]
+    try:
+        return Settings(_env_file=None, _secrets_dir=None, **values)  # type: ignore[call-arg]
+    except ValidationError as exc:
+        # not the exception itself: its text includes the rejected values, e.g. a short
+        # SECRET_KEY, and it would end up in the Worker's logs
+        problems = "; ".join(
+            f"{'.'.join(str(p) for p in e['loc']).upper() or 'SETTINGS'}: {e['msg']}"
+            for e in exc.errors()
+        )
+        raise ValueError(f"Invalid configuration: {problems}") from None
 
 
 @dataclass
@@ -74,8 +90,10 @@ async def build(
     # stdout: Workers show everything written to stderr as an error
     configure_logging(settings.log_level, sys.stdout)
     crypto = Crypto(settings.secret_key.get_secret_value())
+    data_db = await D1Database.open(data, DATA_MIGRATIONS)
+    await data_db.setup([conversations.TABLE, UPDATES_TABLE])  # the Worker's own tables
     store = await Store.from_databases(
-        await D1Database.open(data, DATA_MIGRATIONS),
+        data_db,
         await D1Database.open(keys, KEY_MIGRATIONS),
         crypto,
         policy=RetentionPolicy(settings.retention_days, settings.account_days),
@@ -86,24 +104,18 @@ async def build(
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     # conversations must outlive the isolate: in the database, not in memory
-    dp = build_dispatcher(store, settings, storage=DatabaseStorage(store.db, store.vault, crypto))
+    storage = conversations.DatabaseStorage(store.db, store.vault, crypto)
+    dp = build_dispatcher(store, settings, storage=storage)
     return Runtime(settings, store, bot, dp, crypto.webhook_path())
 
 
 async def _first_delivery(rt: Runtime, update_id: int, now: float) -> bool:
     """Records the update as handled; False if it already was (Telegram sent it again)."""
-    db = rt.store.db
-    row = await db.fetchone("SELECT value FROM meta WHERE key = 'last_update'")
-    if row is not None:
-        last_id, at = json.loads(row["value"])
-        if update_id <= last_id and now - at < REPEAT_WINDOW:
-            return False
-    await db.execute(
-        "INSERT INTO meta (key, value) VALUES ('last_update', ?) "
-        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        (json.dumps([update_id, now]),),
+    changes = await rt.store.db.execute(
+        "INSERT OR IGNORE INTO handled_updates (id, at) VALUES (?, ?)",
+        (f"{rt.bot.id}:{update_id}", int(now)),
     )
-    return True
+    return changes == 1
 
 
 def _authorised(given: str | None, secret: str) -> bool:
@@ -157,6 +169,15 @@ async def handle_request(
     return 404, '{"error":"not found"}'
 
 
-async def handle_scheduled(rt: Runtime) -> None:
+async def handle_scheduled(rt: Runtime, clock: Callable[[], float] = time.time) -> None:
     """The hourly Cron Trigger."""
-    await purge_on_schedule(rt.store, rt.settings.purge_hour, rt.settings.tzinfo)
+    report = await purge_on_schedule(rt.store, rt.settings.purge_hour, rt.settings.tzinfo, clock)
+    if report is not None:  # the daily purge ran: and the Worker's own leftovers
+        await clean_up(rt, clock())
+
+
+async def clean_up(rt: Runtime, now: float) -> None:
+    await conversations.end_stopped(rt.store.db, now)
+    await rt.store.db.execute(
+        "DELETE FROM handled_updates WHERE at < ?", (int(now) - KEEP_UPDATES,)
+    )

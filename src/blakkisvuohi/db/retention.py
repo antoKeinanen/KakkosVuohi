@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from collections.abc import Callable
@@ -14,9 +13,6 @@ from .users import UserRepository
 from .vault import Vault
 
 log = logging.getLogger("blakkis.db")
-
-# Unfinished conversations are kept today and yesterday, so one does not end at midnight
-CONVERSATION_DAYS = 2
 
 
 class Purger:
@@ -47,7 +43,7 @@ class Purger:
         * deletes the drinks older than the retention period
         * deletes the accounts that have not been used for that long
         * removes leftovers: data without a key (it cannot be read by anyone) and keys without data
-          (at the next purge, in case the data was about to be written)
+          (unless the key was taken into use since yesterday: the data may be on its way)
         * rewrites the database files, so that no trace of deleted rows is left in them
         """
         started = time.monotonic()
@@ -66,19 +62,10 @@ class Purger:
             await self._users.remove_row(user_id)
             report.orphans_removed += 1
         # A key without data may belong to somebody who is signing up right now: the key is
-        # created before the data. Only a key that was already without data at the previous
-        # purge is destroyed.
-        row = await self._db.fetchone("SELECT value FROM meta WHERE key = 'orphan_keys'")
-        earlier = set(json.loads(row["value"])) if row else set()
-        orphan_keys = key_ids - data_ids
-        for user_id in orphan_keys & earlier:
-            await self._vault.destroy(user_id)
-            report.orphans_removed += 1
-        await self._db.execute(
-            "INSERT INTO meta (key, value) VALUES ('orphan_keys', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            (json.dumps(sorted(orphan_keys - earlier)),),
-        )
+        # created a moment before the data. Keys taken into use today or yesterday stay.
+        for user_id in key_ids - data_ids:
+            if await self._vault.destroy_unclaimed(user_id, day_number(now) - 1):
+                report.orphans_removed += 1
 
         stale_before = self._policy.account_cutoff_day(now)
         async for account in self._users.scan():
@@ -89,11 +76,6 @@ class Purger:
                 report.drinks_deleted += len(account.drinks) + account.expired_drinks
             elif account.expired_drinks:
                 report.drinks_deleted += await self._drinks.trim(account.user.user_id, account.key)
-
-        # conversations that were left unfinished (only stored when not kept in memory)
-        await self._db.execute(
-            "DELETE FROM conversations WHERE day <= ?", (day_number(now) - CONVERSATION_DAYS,)
-        )
 
         for db in (self._db, self._keydb):
             await db.checkpoint()

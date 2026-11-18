@@ -119,7 +119,7 @@ async def test_retention_is_configurable(tmp_path, crypto, clock):
         await store.close()
 
 
-async def test_purge_removes_leftovers_that_nobody_can_use(store):
+async def test_purge_removes_leftovers_that_nobody_can_use(store, clock):
     user = await make_user(store, 1)
     await make_user(store, 2)
     # data whose key is gone (e.g. the key database was restored from an older copy)
@@ -136,7 +136,8 @@ async def test_purge_removes_leftovers_that_nobody_can_use(store):
     assert await store.vault.get(stray) is not None  # it may be somebody signing up right now
     assert await store.users.find(2) is not None
 
-    report = await store.purge()  # a day later it still has no data: nobody is signing up
+    clock.advance(hours=48)
+    report = await store.purge()  # two days later it still has no data: nobody is signing up
 
     assert report.orphans_removed == 1
     assert await store.vault.get(stray) is None
@@ -338,3 +339,23 @@ async def test_a_failing_purge_is_retried_and_never_kills_the_loop(store, clock)
     delays = await run_loop(store, clock, sleeps_allowed=2)
     assert delays[0] == RETRY_AFTER  # the startup purge failed: retry in an hour
     assert len(calls) == 3
+
+
+async def test_the_purge_does_not_destroy_an_old_key_that_a_new_sign_up_took(store, clock):
+    """A sign up failed long ago and left a key; signing up again takes that same key."""
+    await store.vault.create(store.crypto.user_id(5))
+    await store.purge()  # it is a leftover now
+    clock.advance(hours=24 * 3)
+    create_key = store.vault.create
+
+    async def purge_in_between(user_id):
+        key = await create_key(user_id)
+        await store.purge()
+        return key
+
+    store.vault.create = purge_in_between
+    await store.users.create_or_update(5, "New", 80, "mies", 180)
+    store.vault.create = create_key
+
+    user = await store.users.find(5)
+    assert user is not None and user.nick == "New"

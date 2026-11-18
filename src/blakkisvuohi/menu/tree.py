@@ -625,7 +625,7 @@ async def privacy_select(ctx: MenuContext) -> str:
         retention_days=ctx.settings.retention_days,
         account_days=ctx.settings.account_days,
         where=HELP.privacy.where_workers if workers else HELP.privacy.where_server,
-        history=HELP.privacy.history_workers if workers else "",
+        deletion=HELP.privacy.deletion_workers if workers else HELP.privacy.deletion_server,
     )
 
 
