@@ -472,3 +472,23 @@ async def test_the_privacy_notice_says_where_the_data_is(store, tmp_path):
         privacy = h.new()[-1].text
         assert where in privacy and "{" not in privacy
         assert ("30 päivää" in privacy) is history
+
+
+async def test_update_data_reads_once(store, crypto, clock):
+    """The key and the row may both go between two reads: so there is only one."""
+    await store.db.setup([conversations.TABLE])
+    storage = DatabaseStorage(store.db, store.vault, crypto, clock)
+    key = _key(user=5, chat=5)
+    await store.users.create_or_update(5, "Anto", 87, "mies", 180)
+    await storage.update_data(key, {"juo_last2_drinks": ["Kalja 0.33"]})
+    reads = 0
+    read = storage._read
+
+    async def counted(k):
+        nonlocal reads
+        reads += 1
+        return await read(k)
+
+    storage._read = counted
+    assert await storage.update_data(key, {"x": 1}) == {"juo_last2_drinks": ["Kalja 0.33"], "x": 1}
+    assert reads == 1

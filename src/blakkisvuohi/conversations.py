@@ -130,6 +130,15 @@ class DatabaseStorage(BaseStorage):
         state, _, of_account = await self._read(key)
         await self._write(key, state, dict(data), of_account=of_account)
 
+    async def update_data(self, key: StorageKey, data: Mapping[str, Any]) -> dict[str, Any]:
+        # One read for both the data and where it came from (aiogram's own update_data reads
+        # twice, and the account could be deleted in between)
+        state, current, of_account = await self._read(key)
+        from_account = of_account and bool(current)
+        current.update(data)
+        await self._write(key, state, current, of_account=from_account)
+        return current.copy()
+
     async def get_data(self, key: StorageKey) -> dict[str, Any]:
         return (await self._read(key))[1]
 
