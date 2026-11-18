@@ -492,3 +492,30 @@ async def test_update_data_reads_once(store, crypto, clock):
     storage._read = counted
     assert await storage.update_data(key, {"x": 1}) == {"juo_last2_drinks": ["Kalja 0.33"], "x": 1}
     assert reads == 1
+
+
+def test_aiogram_builds_its_models_when_first_used():
+    """In a Worker aiogram's several hundred models must not all be built when it is imported."""
+    import subprocess
+    import sys
+
+    script = """
+from blakkisvuohi.workers.lazy_models import import_aiogram
+import_aiogram()
+import aiogram.methods, aiogram.types
+models = [getattr(m, n) for m in (aiogram.types, aiogram.methods) for n in m.__all__]
+models = [m for m in models if hasattr(m, "__pydantic_complete__")]
+built = lambda: sum(m.__pydantic_complete__ for m in models)
+before = built()
+update = aiogram.types.Update.model_validate({"update_id": 1, "message": {"message_id": 1,
+    "date": 1, "chat": {"id": 1, "type": "private"}, "from": {"id": 1, "is_bot": False,
+    "first_name": "A"}, "text": "/start"}})
+aiogram.methods.SendMessage(chat_id=1, text="x").model_dump()
+print(len(models), before, built(), update.message.text)
+"""
+    out = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, check=True
+    ).stdout.split()
+    total, before, after, text = int(out[0]), int(out[1]), int(out[2]), out[3]
+    assert total > 300 and before < total // 4  # most are not built at import
+    assert after > before and text == "/start"  # and the ones used work

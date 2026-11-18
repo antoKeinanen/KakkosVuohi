@@ -57,7 +57,9 @@ Webhook mode is not meant for hosts with an ephemeral filesystem such as Heroku.
 
 ### Cloudflare Workers
 
-The same code also runs serverless, as a Python Worker (`src/worker.py`, `wrangler.jsonc`) with **D1** as the two databases. It needs the **Workers Paid** plan: Python does not fit the free plan's 10 ms of CPU per request, and drawing a chart takes seconds the first time an isolate does it. Everything is in the devenv (`devenv shell`, then `pnpm install`).
+The same code also runs serverless, as a Python Worker (`src/worker.py`, `wrangler.jsonc`) with **D1** as the two databases. Everything is in the devenv (`devenv shell`, then `pnpm install`).
+
+**Which plan.** The **Workers Paid** plan runs everything. On the free plan (measured on a temporary free account), the bot deploys and ordinary updates went through, at about 15-25 ms of CPU, and about 0.5 s in a fresh isolate; that is more than the nominal 10 ms, and the platform let it pass. `/kuvaaja` does not work there: drawing a chart takes about 2 s of CPU (matplotlib), and the platform stops the request. The free plan also has 5 Cron Triggers per account (the purge needs one) and 10 D1 databases (the bot needs two).
 
 ```sh
 pnpm exec wrangler d1 create kakkosvuohi-data      # put both ids into wrangler.jsonc
@@ -75,6 +77,7 @@ How it differs from the long running bot:
 * D1 has no interactive transactions. A transaction reads directly and writes everything in one atomic batch at the end; if anything else wrote in the meantime, nothing is written and the user gets the usual error message (`db/d1.py`). With one update at a time this only happens if the purge runs at the same moment.
 * Conversation state (a half-finished `/juoma`, the `/start` menu) is kept in the data database, not in memory (`conversations.py`): under a pseudonymous id, sealed with the user's own key, so that deleting the account shreds it too. Somebody who is signing up has no key yet; what they have typed so far (weight, height, gender) is sealed with a key derived from `SECRET_KEY`. After the daily purge the Worker ends conversations that have not moved for two days. This table, and the one of handled updates, belong to the Worker: the SQLite databases of the long running bot do not have them.
 * Invocation logs are off (`wrangler.jsonc`): they would record the secret webhook path.
+* Two Cloudflare limits shape the build. An isolate may use 128 MB, also when it starts: aiogram builds the validators of all of its several hundred models when it is imported, which alone is about 75 MiB, so the Worker imports it with `workers/lazy_models.py`, and each model is built when it is first used (about 75 MiB in all instead of 130). A Worker may be 64 MiB together with its startup snapshot: `pnpm run deploy` removes what is never used from the vendored packages after `pywrangler sync` (`scripts/prune_worker_bundle.py`: matplotlib's other fonts and backends, most of fontTools, parts of numpy), which leaves about 42 MiB.
 * The purge is an hourly Cron Trigger: it runs at `PURGE_HOUR` local time, or catches up when the last one is more than a day old. `/admin_purge` works as before.
 * The rate limit is per isolate, so it is weaker.
 * For local testing, `pnpm dev` runs the Worker with local D1 databases; put the secrets in `.dev.vars`. `TELEGRAM_API_URL` points the bot at another Bot API server, e.g. a fake one.
@@ -157,7 +160,7 @@ Users can download everything stored about them with `/data` and delete it from 
 
 With [devenv](https://devenv.sh), `devenv shell` gives Python 3.14 + uv (the venv is synced on entry) and, for Cloudflare Workers, Node 24 + pnpm (`pnpm install` gets wrangler; pywrangler is in the uv dev dependencies). `devenv test` runs the tests and ruff and checks wrangler. On NixOS, the `workerd` binary that wrangler installs from npm needs `programs.nix-ld.enable`.
 
-Every test that uses a store runs twice: on the SQLite files and on D1 (faked with SQLite in `tests/fake_d1.py`, which binds numbers as REAL, as D1 does).
+Every test that uses a store runs twice: on the SQLite files and on D1 (faked with SQLite in `tests/fake_d1.py`, which binds numbers as REAL, as D1 does). `TEST_LAZY_AIOGRAM=1 uv run pytest` runs the tests with aiogram imported as in the Worker; CI does both.
 
 ```sh
 uv sync                  # creates .venv with everything

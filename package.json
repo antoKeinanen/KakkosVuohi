@@ -6,7 +6,7 @@
   "license": "GPL-3.0-or-later",
   "scripts": {
     "dev": "uv run pywrangler dev",
-    "deploy": "uv run pywrangler deploy"
+    "deploy": "uv run pywrangler sync && uv run python scripts/prune_worker_bundle.py && wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4.164.0"

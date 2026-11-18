@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 
-from blakkisvuohi.db import D1Database, Store
-from blakkisvuohi.db.database import DATA_MIGRATIONS, KEY_MIGRATIONS
-from blakkisvuohi.security import Crypto
+if os.environ.get("TEST_LAZY_AIOGRAM"):
+    # as in the Worker: aiogram's models are built when first used (workers/lazy_models.py)
+    from blakkisvuohi.workers.lazy_models import import_aiogram
+
+    import_aiogram()
+
+from blakkisvuohi.db import D1Database, Store  # noqa: E402
+from blakkisvuohi.db.database import DATA_MIGRATIONS, KEY_MIGRATIONS  # noqa: E402
+from blakkisvuohi.security import Crypto  # noqa: E402
 
 SECRET = "test-secret-key-that-is-long-enough-0123456789"
 

@@ -33,6 +33,7 @@ jobs:
       - run: uv run ruff check src tests
       - run: uv run ruff format --check src tests
       - run: uv run pytest
+      - run: TEST_LAZY_AIOGRAM=1 uv run pytest -q  # aiogram as in the Worker
 
   image:
     needs: check

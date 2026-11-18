@@ -10,10 +10,14 @@ from urllib.parse import urlsplit
 
 from workers import Response, WorkerEntrypoint
 
-from blakkisvuohi.config import Settings
-from blakkisvuohi.workers import runtime
-from blakkisvuohi.workers.d1 import JsD1Client
-from blakkisvuohi.workers.session import FetchSession
+from blakkisvuohi.workers.lazy_models import import_aiogram
+
+import_aiogram()  # first: all of aiogram's models at once do not fit in an isolate
+
+from blakkisvuohi.config import Settings  # noqa: E402
+from blakkisvuohi.workers import runtime  # noqa: E402
+from blakkisvuohi.workers.d1 import JsD1Client  # noqa: E402
+from blakkisvuohi.workers.session import FetchSession  # noqa: E402
 
 _runtime: runtime.Runtime | None = None
 _building = asyncio.Lock()
