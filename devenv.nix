@@ -39,6 +39,7 @@
 
   enterTest = ''
     uv run pytest -q
+    TEST_LAZY_AIOGRAM=1 uv run pytest -q  # aiogram as in the Worker
     uv run ruff check src tests
     pnpm exec wrangler --version
   '';

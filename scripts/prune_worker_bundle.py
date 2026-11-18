@@ -4,7 +4,7 @@ sync and before `wrangler deploy` (package.json: `pnpm run deploy`).
 
 A Worker may be 64 MiB, together with the memory snapshot that Cloudflare takes of it at deploy
 time. With everything that matplotlib brings it is over that. The bot only draws PNG charts with
-the Agg backend and the DejaVu Sans fonts, so the other fonts, the sample data, the GUI images and
+the Agg backend, DejaVu Sans and the math fonts, so the other fonts, the sample data, the GUI images and
 backends, the parts of numpy and fontTools that matplotlib does not load, and type stubs can go.
 """
 
@@ -47,8 +47,10 @@ REMOVE_GLOBS = [
 ]
 # matplotlib needs only these of fontTools
 KEEP_FONTTOOLS = ("__init__.py", "agl.py", "misc")
-# the fonts that stay: DejaVu Sans (also for $math$ in chat titles) and the fallback
-KEEP_FONTS = ("DejaVuSans.", "DejaVuSans-", "DejaVuSansDisplay.", "LastResortHE-", "LICENSE")
+# The fonts that stay: DejaVu Sans, and the ones mathtext uses (chat titles and nicknames are
+# drawn as matplotlib text, so `$x'$` in one is math): DejaVu Sans Mono, STIX, Computer Modern.
+# Only DejaVu Serif and Humor Sans go.
+KEEP_FONTS = ("DejaVuSans", "STIX", "cm", "LastResortHE-", "LICENSE")
 
 
 def size(path: Path) -> int:
