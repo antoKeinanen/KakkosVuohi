@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Literal
@@ -16,7 +17,8 @@ _WEBHOOK_SECRET_RE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
 def _secrets_dir() -> str | None:
     """Docker/Kubernetes secrets: a file /run/secrets/secret_key etc. works as the variable."""
     path = Path("/run/secrets")
-    return str(path) if path.is_dir() else None
+    # A host's own /run/secrets (e.g. sops-nix on NixOS) is not readable by the user: skip it
+    return str(path) if path.is_dir() and os.access(path, os.R_OK | os.X_OK) else None
 
 
 class Settings(BaseSettings):

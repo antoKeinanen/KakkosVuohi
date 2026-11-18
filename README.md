@@ -127,6 +127,8 @@ Users can download everything stored about them with `/data` and delete it from 
 
 ## Development
 
+With [devenv](https://devenv.sh), `devenv shell` gives Python 3.13 + uv (the venv is synced on entry) and, for the TypeScript / Cloudflare Workers port, Node 24 + pnpm (wrangler, TypeScript, vitest with the Workers pool: `pnpm install`). `devenv test` runs the Python tests and checks wrangler. On NixOS, the `workerd` binary that wrangler installs from npm needs `programs.nix-ld.enable`.
+
 ```sh
 uv sync                  # creates .venv with everything
 uv run pytest            # tests
