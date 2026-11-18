@@ -8,11 +8,14 @@ from collections.abc import Callable
 
 from .database import Database
 from .drinks import DrinkRepository
-from .models import PurgeReport, RetentionPolicy
+from .models import PurgeReport, RetentionPolicy, day_number
 from .users import UserRepository
 from .vault import Vault
 
 log = logging.getLogger("blakkis.db")
+
+# Unfinished conversations are kept today and yesterday, so one does not end at midnight
+CONVERSATION_DAYS = 2
 
 
 class Purger:
@@ -73,6 +76,11 @@ class Purger:
                 report.drinks_deleted += len(account.drinks) + account.expired_drinks
             elif account.expired_drinks:
                 report.drinks_deleted += await self._drinks.trim(account.user.user_id, account.key)
+
+        # conversations that were left unfinished (only stored when not kept in memory)
+        await self._db.execute(
+            "DELETE FROM conversations WHERE day <= ?", (day_number(now) - CONVERSATION_DAYS,)
+        )
 
         for db in (self._db, self._keydb):
             await db.checkpoint()

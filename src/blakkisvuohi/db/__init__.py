@@ -1,4 +1,4 @@
-"""Persistence: two SQLite databases, one for the (encrypted) data and one for the keys."""
+"""Persistence: two databases (SQLite files or D1), one for the (encrypted) data, one for the keys."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from ..security import Crypto
+from .d1 import D1Database, TransactionConflict
 from .database import DATA_MIGRATIONS, KEY_MIGRATIONS, Database
 from .drinks import DrinkRepository, LateDrink, TooManyDrinks
 from .groups import GroupRepository
@@ -61,7 +62,19 @@ class Store:
         except BaseException:
             await db.close()
             raise
-        store = cls(db, keydb, crypto, clock, policy)
+        return await cls.from_databases(db, keydb, crypto, clock, policy)
+
+    @classmethod
+    async def from_databases(
+        cls,
+        db: Database | D1Database,
+        keydb: Database | D1Database,
+        crypto: Crypto,
+        clock: Callable[[], float] = time.time,
+        policy: RetentionPolicy | None = None,
+    ) -> Store:
+        """A store on databases that are already open and migrated, e.g. the D1 ones."""
+        store = cls(db, keydb, crypto, clock, policy)  # type: ignore[arg-type]
         try:
             await store._initialise()
         except BaseException:
@@ -101,11 +114,13 @@ class Store:
 
 __all__ = [
     "AccountGone",
+    "D1Database",
     "Database",
     "LateDrink",
     "PurgeReport",
     "RetentionPolicy",
     "Store",
     "TooManyDrinks",
+    "TransactionConflict",
     "WrongSecretKey",
 ]

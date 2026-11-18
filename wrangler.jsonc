@@ -1,0 +1,27 @@
+// KakkosVuohi as a Python Worker. See README, "Cloudflare Workers".
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kakkosvuohi",
+  "main": "src/worker.py",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["python_workers"],
+
+  // The encrypted data and the keys that decrypt it: two databases, on purpose (README, Security).
+  // Create them with `pnpm exec wrangler d1 create kakkosvuohi-data` (and -keys) and put the ids here.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "kakkosvuohi-data", "database_id": "00000000-0000-0000-0000-000000000000" },
+    { "binding": "KEYS", "database_name": "kakkosvuohi-keys", "database_id": "00000000-0000-0000-0000-000000000001" }
+  ],
+
+  // Hourly: the purge runs at PURGE_HOUR local time, or catches up when it was missed
+  "triggers": { "crons": ["0 * * * *"] },
+
+  // BOT_TOKEN, SECRET_KEY and WEBHOOK_SECRET are secrets: `pnpm exec wrangler secret put BOT_TOKEN`
+  "vars": {
+    "TIMEZONE": "Europe/Helsinki",
+    "PURGE_HOUR": "12",
+    "RETENTION_DAYS": "7",
+    "LOG_LEVEL": "INFO",
+    "ADMIN_ID": ""
+  }
+}

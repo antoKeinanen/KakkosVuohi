@@ -46,7 +46,10 @@ class Settings(BaseSettings):
     timezone: str = "Europe/Helsinki"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
-    bot_mode: Literal["polling", "webhook"] = "polling"
+    # worker: on Cloudflare Workers (worker.py). The webhook is registered with POST /setup-webhook.
+    bot_mode: Literal["polling", "webhook", "worker"] = "polling"
+    # Worker only: another Bot API server, e.g. a local fake one for testing
+    telegram_api_url: str | None = None
     # Webhook mode only: public https base url, e.g. https://blakkis.example.com
     webhook_url: str | None = None
     webhook_secret: SecretStr | None = None
@@ -83,10 +86,12 @@ class Settings(BaseSettings):
         if self.bot_mode == "webhook":
             if not self.webhook_url or not self.webhook_url.startswith("https://"):
                 raise ValueError("WEBHOOK_URL (https) is required in webhook mode")
+        if self.bot_mode in ("webhook", "worker"):
             secret = self.webhook_secret.get_secret_value() if self.webhook_secret else ""
             if not _WEBHOOK_SECRET_RE.match(secret):
                 raise ValueError(
-                    "WEBHOOK_SECRET is required in webhook mode: 16-256 characters of A-Z a-z 0-9 _ -"
+                    f"WEBHOOK_SECRET is required in {self.bot_mode} mode: "
+                    "16-256 characters of A-Z a-z 0-9 _ -"
                 )
         return self
 

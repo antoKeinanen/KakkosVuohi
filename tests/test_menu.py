@@ -395,8 +395,11 @@ async def test_old_buttons_after_a_restart_start_a_fresh_menu(h):
     await h.register()
     await open_menu(h)
     await press(h, JUO.button_text)
-    # the bot restarts: the conversation state in memory is gone
-    h.dp.fsm.storage.storage.clear()
+    # the bot restarts: the conversation state in memory is gone (on Workers: it was purged)
+    if hasattr(h.dp.fsm.storage, "storage"):
+        h.dp.fsm.storage.storage.clear()
+    else:
+        await h.store.db.execute("DELETE FROM conversations")
     (fresh,) = await press(h, JUO.miedot.button_text)
     assert fresh.kind == "send"  # a new message, not an edit of the old one
     assert "Veressäsi on" in fresh.text  # the root

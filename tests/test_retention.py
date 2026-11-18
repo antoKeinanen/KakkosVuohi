@@ -137,7 +137,9 @@ async def test_purge_removes_leftovers_that_nobody_can_use(store):
     assert await store.users.find(2) is not None
 
 
-async def test_purged_data_leaves_no_trace_in_the_files(store, clock, tmp_path):
+async def test_purged_data_leaves_no_trace_in_the_files(store, backend, clock, tmp_path):
+    if backend == "d1":
+        pytest.skip("D1 manages its storage: no secure_delete, VACUUM or checkpoint (see README)")
     user = await make_user(store, 1, "Doomed")
     row = await store.db.fetchone("SELECT profile, drinks FROM users")
     wrapped = (await store.keydb.fetchone("SELECT wrapped_key FROM user_keys"))["wrapped_key"]

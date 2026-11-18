@@ -32,11 +32,15 @@ class TooManyDrinks(Exception):
 
 async def bump_counters(tx: Transaction, drinks: int, milligrams: int) -> None:
     """Counters of everything ever recorded. They contain no personal data."""
+    # CAST(? ...): D1 binds every number as a REAL, which would store "2.0"
     await tx.execute(
-        "UPDATE meta SET value = CAST(value AS INTEGER) + ? WHERE key = 'drinks_total'", (drinks,)
+        "UPDATE meta SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER) "
+        "WHERE key = 'drinks_total'",
+        (drinks,),
     )
     await tx.execute(
-        "UPDATE meta SET value = CAST(value AS INTEGER) + ? WHERE key = 'alcohol_total'",
+        "UPDATE meta SET value = CAST(value AS INTEGER) + CAST(? AS INTEGER) "
+        "WHERE key = 'alcohol_total'",
         (milligrams,),
     )
 

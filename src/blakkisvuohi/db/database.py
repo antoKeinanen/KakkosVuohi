@@ -44,6 +44,17 @@ DATA_MIGRATIONS: list[str] = [
     ) STRICT;
     CREATE INDEX users_in_groups_by_group ON users_in_groups (group_id);
     """,
+    # Conversation state, when it cannot be kept in memory (Workers, see conversations.py).
+    #   id     HMAC of the bot, chat and user ids
+    #   value  encrypted: the state and its data
+    #   day    of the last change, for the purge
+    """
+    CREATE TABLE conversations (
+        id    TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        day   INTEGER NOT NULL
+    ) STRICT;
+    """,
 ]
 
 # The key database holds the wrapped data key of every user, and nothing else.

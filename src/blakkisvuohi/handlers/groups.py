@@ -5,12 +5,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import time
 
 from aiogram.filters import CommandObject
 from aiogram.types import BufferedInputFile, Message
 
-from .. import alcomath, charts
+from .. import alcomath
 from ..access import ANYWHERE, CHAT, USER, access, cmd
 from ..config import Settings
 from ..db import Store
@@ -165,10 +166,15 @@ async def kuvaaja(message: Message, store: Store, user: User, settings: Settings
         members = await store.groups.members_with_drinks(message.chat.id)
 
     try:
+        # imported here: matplotlib is heavy, and on Workers every isolate would load it
+        from .. import charts
+
+        args = (list(members.values()), title, time.time(), settings.tzinfo)
         async with _chart_slots:
-            png = await asyncio.to_thread(
-                charts.render_chart, list(members.values()), title, time.time(), settings.tzinfo
-            )
+            if sys.platform == "emscripten":  # Workers (Pyodide) have no threads
+                png = charts.render_chart(*args)
+            else:
+                png = await asyncio.to_thread(charts.render_chart, *args)
     except Exception:
         log.exception("Rendering a chart failed")
         await message.answer(S.commands.kuvaaja.img_failed)

@@ -13,6 +13,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.base import BaseSession
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.base import BaseStorage
 from aiogram.methods import (
     AnswerCallbackQuery,
     DeleteWebhook,
@@ -21,6 +22,7 @@ from aiogram.methods import (
     SendDocument,
     SendMessage,
     SendPhoto,
+    SetWebhook,
 )
 from aiogram.types import CallbackQuery, Chat, Message, Update, User
 
@@ -48,7 +50,7 @@ class FakeSession(BaseSession):
         self.requests.append(method)
         if isinstance(method, GetMe):
             return User(id=42, is_bot=True, first_name="KakkosVuohi", username=BOT_USERNAME)
-        if isinstance(method, (DeleteWebhook, AnswerCallbackQuery)):
+        if isinstance(method, (DeleteWebhook, SetWebhook, AnswerCallbackQuery)):
             return True
         chat_id = getattr(method, "chat_id", None)
         if chat_id in self.fail_with:
@@ -249,13 +251,21 @@ def make_settings(tmp_path, **overrides: Any) -> Settings:
 
 
 async def make_harness(
-    store, tmp_path, *, throttle: ThrottleMiddleware | None = None, **settings
+    store,
+    tmp_path,
+    *,
+    throttle: ThrottleMiddleware | None = None,
+    storage: BaseStorage | None = None,
+    **settings,
 ) -> Harness:
     cfg = make_settings(tmp_path, **settings)
     session = FakeSession()
     bot = Bot("42:TEST", session=session, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     # tests send many updates quickly: only the throttling tests use a real limit
     dp = build_dispatcher(
-        store, cfg, throttle=throttle or ThrottleMiddleware(rate=1000, burst=100000)
+        store,
+        cfg,
+        storage=storage,
+        throttle=throttle or ThrottleMiddleware(rate=1000, burst=100000),
     )
     return Harness(store, cfg, dp, bot, session)

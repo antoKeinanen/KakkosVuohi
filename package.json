@@ -5,17 +5,10 @@
   "type": "module",
   "license": "GPL-3.0-or-later",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "types": "wrangler types",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "dev": "uv run pywrangler dev",
+    "deploy": "uv run pywrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.23.0",
-    "@types/node": "^26.6.6",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.12",
     "wrangler": "^4.164.0"
   },
   "packageManager": "pnpm@12.9.0"

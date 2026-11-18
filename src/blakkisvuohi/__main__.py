@@ -19,6 +19,9 @@ def main() -> None:
             name = ".".join(str(part) for part in error["loc"]) or "settings"
             print(f"  {name.upper()}: {error['msg']}", file=sys.stderr)
         sys.exit(2)
+    if settings.bot_mode == "worker":
+        print("BOT_MODE=worker is for Cloudflare Workers (src/worker.py)", file=sys.stderr)
+        sys.exit(2)
 
     configure_logging(settings.log_level)
     try:
