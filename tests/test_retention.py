@@ -130,11 +130,36 @@ async def test_purge_removes_leftovers_that_nobody_can_use(store):
 
     report = await store.purge()
 
-    assert report.orphans_removed == 2
+    assert report.orphans_removed == 1
     assert report.accounts_scanned == 1
     assert await store.db.fetchone("SELECT 1 FROM users WHERE user_id = ?", (user.user_id,)) is None
+    assert await store.vault.get(stray) is not None  # it may be somebody signing up right now
+    assert await store.users.find(2) is not None
+
+    report = await store.purge()  # a day later it still has no data: nobody is signing up
+
+    assert report.orphans_removed == 1
     assert await store.vault.get(stray) is None
     assert await store.users.find(2) is not None
+
+
+async def test_the_purge_does_not_destroy_the_key_of_somebody_signing_up(store):
+    create_key = store.vault.create
+
+    async def purge_in_between(user_id):
+        # the purge (a Cron Trigger, another isolate) runs between the two steps of signing up:
+        # the key exists, the data not yet
+        key = await create_key(user_id)
+        await store.purge()
+        return key
+
+    store.vault.create = purge_in_between
+    await store.users.create_or_update(5, "New", 80, "mies", 180)
+    store.vault.create = create_key
+    await store.purge()  # the next day
+
+    user = await store.users.find(5)
+    assert user is not None and user.nick == "New"
 
 
 async def test_purged_data_leaves_no_trace_in_the_files(store, backend, clock, tmp_path):

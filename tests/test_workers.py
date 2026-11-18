@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from email.parser import BytesParser
 from email.policy import HTTP
 from urllib.parse import parse_qs
@@ -10,14 +11,15 @@ from urllib.parse import parse_qs
 import pytest
 from aiogram.fsm.storage.base import StorageKey
 from aiogram.methods import SendMessage, SetWebhook
-from conftest import SECRET
+from conftest import SECRET, Clock, open_d1_store
 from fake_d1 import SqliteD1
-from harness import FakeSession
+from harness import FakeSession, make_settings
 
 from blakkisvuohi.conversations import DatabaseStorage
 from blakkisvuohi.db import D1Database, TransactionConflict
 from blakkisvuohi.db.database import DATA_MIGRATIONS
 from blakkisvuohi.scheduler import purge_on_schedule
+from blakkisvuohi.security import DecryptionError
 from blakkisvuohi.strings import S
 from blakkisvuohi.workers import runtime
 from blakkisvuohi.workers.session import encode_form
@@ -101,9 +103,30 @@ async def test_d1_migrations_run_once_and_refuse_a_newer_schema(tmp_path):
     await db.execute("INSERT INTO meta (key, value) VALUES ('kept', '1')")
     db, _ = await open_d1(tmp_path)  # again: nothing to do, nothing lost
     assert await db.fetchone("SELECT 1 FROM meta WHERE key = 'kept'") is not None
+    client.conn.execute("DROP TRIGGER _d1_schema_order")  # only to fake a newer bot's database
     client.conn.execute("UPDATE _d1_state SET schema_version = 99")
     with pytest.raises(RuntimeError, match="newer"):
         await open_d1(tmp_path)
+
+
+async def test_a_migration_applies_only_on_top_of_the_previous_one(tmp_path):
+    """Two isolates starting at once: the second must not apply the same migration again."""
+    _, client = await open_d1(tmp_path)
+    version = client.conn.execute("SELECT schema_version FROM _d1_state").fetchone()[0]
+    with pytest.raises(sqlite3.IntegrityError, match="migrated meanwhile"):
+        await client.batch(
+            [("UPDATE _d1_state SET schema_version = ? WHERE id = 1", (version,))]  # again
+        )
+
+
+async def test_a_cold_start_writes_nothing(tmp_path, crypto, clock):
+    """Every new isolate opens the store: that must not abort transactions in flight."""
+    store = await open_d1_store(tmp_path, crypto, clock)
+    async with store.db.transaction() as tx:
+        await tx.fetchall("SELECT * FROM meta")
+        await open_d1_store(tmp_path, crypto, clock)  # another isolate starts meanwhile
+        await tx.execute("INSERT INTO meta (key, value) VALUES ('x', 'y')")
+    assert await store.db.fetchone("SELECT 1 FROM meta WHERE key = 'x'") is not None
 
 
 # -- stored conversations -------------------------------------------------------------------------
@@ -114,8 +137,9 @@ def _key(user: int = 62461364, chat: int = 62461364) -> StorageKey:
 
 
 async def test_conversations_are_stored_sealed_and_pseudonymous(tmp_path, crypto, clock):
-    db, client = await open_d1(tmp_path)
-    storage = DatabaseStorage(db, crypto, clock)
+    store = await open_d1_store(tmp_path, crypto, clock)
+    client = store.db._client
+    storage = DatabaseStorage(store.db, store.vault, crypto, clock)
     await storage.set_state(_key(), "Tunnus:height")
     await storage.update_data(_key(), {"weight": 87, "nick": "Anto Keinänen"})
 
@@ -133,8 +157,30 @@ async def test_conversations_are_stored_sealed_and_pseudonymous(tmp_path, crypto
     assert client.conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0] == 0
 
 
+async def test_conversations_of_users_are_shredded_with_their_account(store, crypto, clock):
+    """Once a user has an account, their state is sealed with their key, not with SECRET_KEY."""
+    storage = DatabaseStorage(store.db, store.vault, crypto, clock)
+    key = _key(user=5, chat=5)
+
+    async def stored() -> str:
+        return (await store.db.fetchone("SELECT value FROM conversations"))["value"]
+
+    await storage.update_data(key, {"weight": 87})  # signing up: no account, no key yet
+    assert (await stored()).startswith("s:")
+    user, _ = await store.users.create_or_update(5, "Anto", 87, "mies", 180)
+    assert await storage.get_data(key) == {"weight": 87}  # still readable after signing up
+    await storage.update_data(key, {"juo_last2_drinks": ["Kalja 0.33"]})
+    sealed = await stored()
+    assert sealed.startswith("u:")
+    with pytest.raises(DecryptionError):  # SECRET_KEY alone does not open it
+        crypto.conversation_key.open(sealed[2:], aad=f"{storage._id(key)}:conversation")
+
+    await store.users.delete(user)
+    assert await storage.get_data(key) == {}  # gone with the key, whatever copies remain
+
+
 async def test_the_purge_ends_conversations_that_stopped(store, crypto, clock):
-    storage = DatabaseStorage(store.db, crypto, clock)
+    storage = DatabaseStorage(store.db, store.vault, crypto, clock)
     await storage.set_state(_key(user=1), "old")
     clock.advance(hours=24)
     await storage.set_state(_key(user=2), "yesterday")
@@ -231,11 +277,13 @@ def message_update(update_id: int, text: str, user: int = 5) -> str:
     )
 
 
-def test_settings_come_from_the_worker_environment():
+def test_settings_come_from_the_worker_environment(tmp_path):
     settings = runtime.settings_from(worker_env(RETENTION_DAYS="3"))
     assert (settings.bot_mode, settings.retention_days, settings.admin_id) == ("worker", 3, None)
     with pytest.raises(ValueError, match="WEBHOOK_SECRET"):
         runtime.settings_from(worker_env(WEBHOOK_SECRET="short"))
+    with pytest.raises(ValueError, match="TELEGRAM_API_URL"):  # it would do nothing there
+        make_settings(tmp_path, telegram_api_url="http://localhost:8081")
 
 
 async def test_only_telegram_can_post_updates(tmp_path):
@@ -295,3 +343,51 @@ async def test_the_webhook_is_registered_on_request_of_the_operator(tmp_path):
     assert call.secret_token == WEBHOOK_SECRET
     assert call.max_connections == 1  # one update at a time
     assert call.allowed_updates == ["message", "callback_query"]
+
+
+async def test_an_update_is_handled_at_most_once(tmp_path):
+    """Telegram sends an update again if the Worker failed or was slow: no second drink."""
+    good = {runtime.SECRET_HEADER: WEBHOOK_SECRET}
+    rt, session = await build_runtime(tmp_path)
+    await rt.store.users.create_or_update(5, "Anto", 80, "mies", 180)
+    clock = Clock()
+
+    async def post(update_id: int) -> int:
+        update = message_update(update_id, "/kalja033")
+        return (await runtime.handle_request(rt, "POST", rt.webhook_path, good, update, "", clock))[
+            0
+        ]
+
+    assert await post(100) == 200
+    rt, session = await build_runtime(tmp_path)  # sent again, to another isolate
+    assert await post(100) == 200
+    assert await post(99) == 200  # an older one
+    assert session.requests == []
+    user = await rt.store.users.find(5)
+    assert len(await rt.store.drinks.since(user, 24)) == 1
+
+    # after a week without updates Telegram starts from a random number
+    clock.advance(hours=24 * 7)
+    assert await post(7) == 200
+    assert len(await rt.store.drinks.since(user, 24 * 8)) == 2
+
+
+async def test_the_privacy_notice_says_where_the_data_is(store, tmp_path):
+    from harness import make_harness
+
+    help_ = S.commands.start.help
+    for overrides, where, history in (
+        ({}, help_.privacy.where_server, False),
+        (
+            {"bot_mode": "worker", "webhook_secret": WEBHOOK_SECRET},
+            help_.privacy.where_workers,
+            True,
+        ),
+    ):
+        h = await make_harness(store, tmp_path, **overrides)
+        await h.say("/start")
+        await h.press(help_.button_text)
+        await h.press(help_.privacy.button_text)
+        privacy = h.new()[-1].text
+        assert where in privacy and "{" not in privacy
+        assert ("30 päivää" in privacy) is history

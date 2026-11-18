@@ -620,8 +620,12 @@ def _luo_tunnus() -> Node:
 
 
 async def privacy_select(ctx: MenuContext) -> str:
+    workers = ctx.settings.bot_mode == "worker"  # the data is with Cloudflare, see README
     return HELP.privacy.on_select.format(
-        retention_days=ctx.settings.retention_days, account_days=ctx.settings.account_days
+        retention_days=ctx.settings.retention_days,
+        account_days=ctx.settings.account_days,
+        where=HELP.privacy.where_workers if workers else HELP.privacy.where_server,
+        history=HELP.privacy.history_workers if workers else "",
     )
 
 

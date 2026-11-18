@@ -16,17 +16,14 @@ class SqliteD1:
     def __init__(self, path: str) -> None:
         self.conn = sqlite3.connect(path, isolation_level=None)
         self.conn.execute("PRAGMA foreign_keys = ON")  # as in D1, where it is always on
-        self.queries = 0
 
     async def query(self, sql: str, params: Sequence[Any]) -> tuple[list[str], list[list[Any]]]:
-        self.queries += 1
         cursor = self.conn.execute(sql, _d1_params(params))
         columns = [d[0] for d in cursor.description or []]
         return columns, [list(row) for row in cursor.fetchall()]
 
     async def batch(self, statements: Sequence[tuple[str, Sequence[Any]]]) -> list[int]:
         """All or nothing, like a D1 batch."""
-        self.queries += 1
         self.conn.execute("BEGIN IMMEDIATE")
         try:
             changes = []

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from collections.abc import Callable
@@ -46,6 +47,7 @@ class Purger:
         * deletes the drinks older than the retention period
         * deletes the accounts that have not been used for that long
         * removes leftovers: data without a key (it cannot be read by anyone) and keys without data
+          (at the next purge, in case the data was about to be written)
         * rewrites the database files, so that no trace of deleted rows is left in them
         """
         started = time.monotonic()
@@ -63,9 +65,20 @@ class Purger:
         for user_id in data_ids - key_ids:
             await self._users.remove_row(user_id)
             report.orphans_removed += 1
-        for user_id in key_ids - data_ids:
+        # A key without data may belong to somebody who is signing up right now: the key is
+        # created before the data. Only a key that was already without data at the previous
+        # purge is destroyed.
+        row = await self._db.fetchone("SELECT value FROM meta WHERE key = 'orphan_keys'")
+        earlier = set(json.loads(row["value"])) if row else set()
+        orphan_keys = key_ids - data_ids
+        for user_id in orphan_keys & earlier:
             await self._vault.destroy(user_id)
             report.orphans_removed += 1
+        await self._db.execute(
+            "INSERT INTO meta (key, value) VALUES ('orphan_keys', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (json.dumps(sorted(orphan_keys - earlier)),),
+        )
 
         stale_before = self._policy.account_cutoff_day(now)
         async for account in self._users.scan():

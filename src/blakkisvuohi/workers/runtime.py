@@ -4,7 +4,10 @@ Plain Python: the JavaScript side (src/worker.py) hands in the configuration, th
 the session.
 
 Telegram is told to send one update at a time (max_connections=1), so that updates are handled in
-order, as in the long running bot. A request returns when its update has been handled.
+order, as in the long running bot. A request returns when its update has been handled. An update
+is handled at most once: Telegram sends it again if the Worker failed (or was too slow), and a
+second /kalja033 must not record a second drink, nor must an update that crashes the Worker block
+all the others.
 """
 
 from __future__ import annotations
@@ -13,7 +16,8 @@ import hmac
 import json
 import logging
 import sys
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,6 +38,9 @@ from ..security import Crypto
 log = logging.getLogger("blakkis.system")
 
 SECRET_HEADER = "x-telegram-bot-api-secret-token"  # noqa: S105 - a header name
+
+# Telegram numbers updates in order, but picks a random number after a week without updates
+REPEAT_WINDOW = 6 * 24 * 3600
 
 
 def settings_from(env: Mapping[str, Any]) -> Settings:
@@ -79,8 +86,24 @@ async def build(
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     # conversations must outlive the isolate: in the database, not in memory
-    dp = build_dispatcher(store, settings, storage=DatabaseStorage(store.db, crypto))
+    dp = build_dispatcher(store, settings, storage=DatabaseStorage(store.db, store.vault, crypto))
     return Runtime(settings, store, bot, dp, crypto.webhook_path())
+
+
+async def _first_delivery(rt: Runtime, update_id: int, now: float) -> bool:
+    """Records the update as handled; False if it already was (Telegram sent it again)."""
+    db = rt.store.db
+    row = await db.fetchone("SELECT value FROM meta WHERE key = 'last_update'")
+    if row is not None:
+        last_id, at = json.loads(row["value"])
+        if update_id <= last_id and now - at < REPEAT_WINDOW:
+            return False
+    await db.execute(
+        "INSERT INTO meta (key, value) VALUES ('last_update', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (json.dumps([update_id, now]),),
+    )
+    return True
 
 
 def _authorised(given: str | None, secret: str) -> bool:
@@ -88,7 +111,13 @@ def _authorised(given: str | None, secret: str) -> bool:
 
 
 async def handle_request(
-    rt: Runtime, method: str, path: str, headers: Mapping[str, str], body: str, origin: str
+    rt: Runtime,
+    method: str,
+    path: str,
+    headers: Mapping[str, str],
+    body: str,
+    origin: str,
+    clock: Callable[[], float] = time.time,
 ) -> tuple[int, str]:
     """Status and JSON body. `headers` have lower case names; `origin` is e.g. https://x.dev"""
     if method == "GET" and path == "/healthz":
@@ -102,8 +131,11 @@ async def handle_request(
             update = json.loads(body)
         except ValueError:
             return 400, '{"error":"bad request"}'
-        if not isinstance(update, dict):
+        if not isinstance(update, dict) or not isinstance(update.get("update_id"), int):
             return 400, '{"error":"bad request"}'
+        if not await _first_delivery(rt, update["update_id"], clock()):
+            log.info("Update %d was already handled", update["update_id"])
+            return 200, "{}"
         await rt.dp.feed_raw_update(rt.bot, update)
         return 200, "{}"
 

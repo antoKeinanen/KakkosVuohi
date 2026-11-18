@@ -13,6 +13,9 @@
     { "binding": "KEYS", "database_name": "kakkosvuohi-keys", "database_id": "00000000-0000-0000-0000-000000000001" }
   ],
 
+  // No invocation logs: they would record the secret webhook path of every request
+  "observability": { "enabled": true, "logs": { "invocation_logs": false } },
+
   // Hourly: the purge runs at PURGE_HOUR local time, or catches up when it was missed
   "triggers": { "crons": ["0 * * * *"] },
 

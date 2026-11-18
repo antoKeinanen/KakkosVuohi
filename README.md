@@ -71,9 +71,10 @@ The other settings are `vars` in `wrangler.jsonc`. The last command registers th
 
 How it differs from the long running bot:
 
-* Telegram sends **one update at a time** (`max_connections=1`), and a request returns when its update has been handled. Updates are handled in order, as before.
+* Telegram sends **one update at a time** (`max_connections=1`), and a request returns when its update has been handled. Updates are handled in order, as before, and **at most once**: Telegram sends an update again when a request failed or was too slow, and the Worker skips it (no second drink, and an update that crashes the Worker cannot block the ones after it).
 * D1 has no interactive transactions. A transaction reads directly and writes everything in one atomic batch at the end; if anything else wrote in the meantime, nothing is written and the user gets the usual error message (`db/d1.py`). With one update at a time this only happens if the purge runs at the same moment.
-* Conversation state (a half-finished `/juoma`, the `/start` menu) is kept in the data database, sealed like everything else (`conversations.py`), not in memory. The purge ends conversations that have not moved for two days.
+* Conversation state (a half-finished `/juoma`, the `/start` menu) is kept in the data database, not in memory (`conversations.py`): under a pseudonymous id, sealed with the user's own key, so that deleting the account shreds it too. Somebody who is signing up has no key yet; what they have typed so far (weight, height, gender) is sealed with a key derived from `SECRET_KEY`. The purge ends conversations that have not moved for two days.
+* Invocation logs are off (`wrangler.jsonc`): they would record the secret webhook path.
 * The purge is an hourly Cron Trigger: it runs at `PURGE_HOUR` local time, or catches up when the last one is more than a day old. `/admin_purge` works as before.
 * The rate limit is per isolate, so it is weaker.
 * For local testing, `pnpm dev` runs the Worker with local D1 databases; put the secrets in `.dev.vars`. `TELEGRAM_API_URL` points the bot at another Bot API server, e.g. a fake one.
@@ -102,9 +103,9 @@ The bot keeps little personal data (a nickname, weight, height, gender, the drin
 
 ### 3. The daily purge
 
-At `PURGE_HOUR` (noon by default, in `TIMEZONE`) the bot deletes expired drinks and accounts, removes leftovers (data without a key, keys without data), and rewrites both database files so that no trace of deleted rows is left (`secure_delete`, WAL checkpoint, `VACUUM`). If the bot was down at noon, it purges at startup instead. `/admin_purge` runs it on demand. The same rules are applied when reading, so data past the retention period is ignored even if a purge has failed.
+At `PURGE_HOUR` (noon by default, in `TIMEZONE`) the bot deletes expired drinks and accounts, removes leftovers (data without a key; keys without data, at the next purge, as the key of somebody signing up exists a moment before their data), and rewrites both database files so that no trace of deleted rows is left (`secure_delete`, WAL checkpoint, `VACUUM`). If the bot was down at noon, it purges at startup instead. `/admin_purge` runs it on demand. The same rules are applied when reading, so data past the retention period is ignored even if a purge has failed.
 
-**On Cloudflare Workers (D1)** two of these guarantees are weaker. D1 manages its own storage: there is no `secure_delete`, checkpoint or `VACUUM`. And D1 [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) always keeps 30 days of history (7 on the free plan) that the Cloudflare account can restore, for both databases. A deleted account is therefore not crypto-shredded until that history has expired: whoever controls the Cloudflare account (or Cloudflare) can bring it back for 30 days. Deleted data is still never read by the bot.
+**On Cloudflare Workers (D1)** two of these guarantees are weaker. D1 manages its own storage: there is no `secure_delete`, checkpoint or `VACUUM`. And D1 [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) always keeps 30 days of history (7 on the free plan) that the Cloudflare account can restore, for both databases. A deleted account is therefore not crypto-shredded until that history has expired: whoever controls the Cloudflare account (or Cloudflare) can bring it back for 30 days. Deleted data is still never read by the bot. Unfinished sign ups are the one thing sealed with a key derived from `SECRET_KEY` alone: a copy of the data database together with `SECRET_KEY` reveals what was typed into sign ups of the last two days (or of the D1 history).
 
 ### What a leak gives away
 

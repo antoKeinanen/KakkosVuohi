@@ -67,5 +67,5 @@ async def h(store, backend, crypto, clock, tmp_path):
     if backend == "d1":  # as on Workers: conversations in the database
         from blakkisvuohi.conversations import DatabaseStorage
 
-        storage = DatabaseStorage(store.db, crypto, clock)
+        storage = DatabaseStorage(store.db, store.vault, crypto, clock)
     return await make_harness(store, tmp_path, storage=storage)

@@ -23,6 +23,7 @@ from typing import Any, Protocol
 log = logging.getLogger("blakkis.db")
 
 _CONFLICT = "kakkosvuohi: write conflict"
+_MIGRATED = "kakkosvuohi: migrated meanwhile"
 
 # Bookkeeping of this module, created before the migrations. Not part of DATA_MIGRATIONS: the
 # SQLite databases do not need it (they have PRAGMA user_version and real transactions).
@@ -41,6 +42,15 @@ _SETUP = [
     WHEN NEW.write_version != OLD.write_version + 1
     BEGIN
         SELECT RAISE(ABORT, '{_CONFLICT}');
+    END
+    """,
+    # a migration applies only on top of the one before it, also when two isolates race
+    f"""
+    CREATE TRIGGER IF NOT EXISTS _d1_schema_order
+    BEFORE UPDATE OF schema_version ON _d1_state
+    WHEN NEW.schema_version != OLD.schema_version + 1
+    BEGIN
+        SELECT RAISE(ABORT, '{_MIGRATED}');
     END
     """,
 ]
@@ -136,7 +146,7 @@ class D1Database:
     async def _migrate(self) -> None:
         await self._client.batch([(sql, ()) for sql in _SETUP])
         row = await self._fetchone("SELECT schema_version FROM _d1_state WHERE id = 1")
-        version = row[0] if row else 0
+        version = int(row[0]) if row else 0
         if version > len(self._migrations):
             raise RuntimeError(
                 f"Database schema version {version} is newer than this bot supports "
@@ -144,11 +154,11 @@ class D1Database:
             )
         for number, script in enumerate(self._migrations[version:], start=version + 1):
             log.info("Applying database migration %d", number)
-            # A batch is atomic. Should two isolates migrate at once, the second one fails on
-            # the CREATE statements and nothing of it is applied.
+            # A batch is atomic, and the version is set first: should two isolates migrate at
+            # once, the trigger aborts the second one before any of its statements ran.
             await self._client.batch(
-                [(sql, ()) for sql in _statements(script)]
-                + [("UPDATE _d1_state SET schema_version = ? WHERE id = 1", (number,)), _BUMP]
+                [("UPDATE _d1_state SET schema_version = ? WHERE id = 1", (number,)), _BUMP]
+                + [(sql, ()) for sql in _statements(script)]
             )
 
     async def close(self) -> None:

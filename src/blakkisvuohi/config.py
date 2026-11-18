@@ -86,6 +86,8 @@ class Settings(BaseSettings):
         if self.bot_mode == "webhook":
             if not self.webhook_url or not self.webhook_url.startswith("https://"):
                 raise ValueError("WEBHOOK_URL (https) is required in webhook mode")
+        if self.telegram_api_url and self.bot_mode != "worker":
+            raise ValueError("TELEGRAM_API_URL is only used on Cloudflare Workers")
         if self.bot_mode in ("webhook", "worker"):
             secret = self.webhook_secret.get_secret_value() if self.webhook_secret else ""
             if not _WEBHOOK_SECRET_RE.match(secret):

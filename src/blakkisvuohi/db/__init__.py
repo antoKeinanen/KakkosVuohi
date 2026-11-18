@@ -100,9 +100,11 @@ class Store:
                     "Refusing to start: the stored data would be unreadable."
                 )
         for counter in ("drinks_total", "alcohol_total"):
-            await self.db.execute(
-                "INSERT OR IGNORE INTO meta (key, value) VALUES (?, '0')", (counter,)
-            )
+            # only when missing: on D1 every write makes other transactions in flight start over
+            if await self.db.fetchone("SELECT 1 FROM meta WHERE key = ?", (counter,)) is None:
+                await self.db.execute(
+                    "INSERT OR IGNORE INTO meta (key, value) VALUES (?, '0')", (counter,)
+                )
 
     async def purge(self) -> PurgeReport:
         return await self.purger.run()
