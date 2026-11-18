@@ -63,7 +63,7 @@ The same code also runs serverless, as a Python Worker (`src/worker.py`, `wrangl
 pnpm exec wrangler d1 create kakkosvuohi-data      # put both ids into wrangler.jsonc
 pnpm exec wrangler d1 create kakkosvuohi-keys
 pnpm exec wrangler secret put BOT_TOKEN            # and SECRET_KEY, WEBHOOK_SECRET
-pnpm deploy
+pnpm run deploy                                    # not `pnpm deploy`: that is pnpm's own command
 curl -X POST -H "Authorization: Bearer $WEBHOOK_SECRET" https://kakkosvuohi.<you>.workers.dev/setup-webhook
 ```
 

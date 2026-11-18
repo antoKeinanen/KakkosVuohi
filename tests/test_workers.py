@@ -202,6 +202,23 @@ async def test_state_of_an_account_deleted_meanwhile_is_not_sealed_again(store, 
     assert await store.db.fetchone("SELECT 1 FROM conversations") is None
 
 
+async def test_the_menu_goes_on_after_the_account_was_deleted(store, crypto, clock):
+    """Deleting the account in the menu: the menu itself must stay in session."""
+    await store.db.setup([conversations.TABLE])
+    storage = DatabaseStorage(store.db, store.vault, crypto, clock)
+    key = _key(user=5, chat=5)
+    user, _ = await store.users.create_or_update(5, "Anto", 87, "mies", 180)
+    await storage.set_state(key, "Menu:active")
+    await storage.update_data(key, {"menu_node": "asetukset/poista", "menu_vars": {"x": 1}})
+
+    await store.users.delete(user)
+    await storage.set_state(key, "Menu:active")  # what the menu saves after deleting
+    await storage.update_data(key, {"menu_node": "root", "menu_vars": {}})
+
+    assert await storage.get_state(key) == "Menu:active"
+    assert await storage.get_data(key) == {"menu_node": "root", "menu_vars": {}}
+
+
 async def test_stopped_conversations_end_after_the_daily_purge(store, crypto, clock):
     await store.db.setup([conversations.TABLE])
     storage = DatabaseStorage(store.db, store.vault, crypto, clock)

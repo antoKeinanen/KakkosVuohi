@@ -117,7 +117,8 @@ class DatabaseStorage(BaseStorage):
     async def set_state(self, key: StorageKey, state: StateType = None) -> None:
         _, data, of_account = await self._read(key)
         new_state = state.state if isinstance(state, State) else state
-        await self._write(key, new_state, data, of_account=of_account)
+        # only data that came out of the account must go with it: a new state may be written
+        await self._write(key, new_state, data, of_account=of_account and bool(data))
 
     async def get_state(self, key: StorageKey) -> str | None:
         return (await self._read(key))[0]
