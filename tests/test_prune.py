@@ -69,7 +69,13 @@ def test_charts_look_the_same_with_the_fonts_that_stay():
     members = [
         GroupMember("u", r"$\alpha$ nick", 80, "mies", 180, [DrinkRow(12000, "x", int(now - 3600))])
     ]
-    titles = ["$x'$", r"$\sum\alpha^2$ ja $5", "Bileet $1 $2", r"$\mathcal{A}\mathbb{R}$"]
+    titles = [
+        "$x'$",
+        r"$\sum\alpha^2$ ja $5",
+        "Bileet $1 $2",
+        r"$\mathcal{A}\mathbb{R}$",
+        r"$\mathtt{x}$",
+    ]
 
     def forget_fonts() -> None:
         font_manager.FontManager._findfont_cached.cache_clear()
@@ -92,6 +98,7 @@ def test_charts_look_the_same_with_the_fonts_that_stay():
         font_manager.ttfFontProperty(font_manager.get_font(str(path)))
         for path in sorted(ttf.glob("*.ttf"))
     ]
+    rng = random.getstate()
     try:
         manager.ttflist = bundled  # as in the Worker: no system fonts
         full = render()
@@ -100,3 +107,4 @@ def test_charts_look_the_same_with_the_fonts_that_stay():
     finally:
         manager.ttflist = every
         forget_fonts()
+        random.setstate(rng)
