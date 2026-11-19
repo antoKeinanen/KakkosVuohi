@@ -7,6 +7,7 @@ import contextlib
 import logging
 import signal
 import time
+from typing import TextIO
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -100,9 +101,12 @@ async def _on_error(event: ErrorEvent, bot: Bot, settings: Settings) -> bool:
     return True
 
 
-def configure_logging(level: str) -> None:
+def configure_logging(level: str, stream: TextIO | None = None) -> None:
     logging.basicConfig(
-        level=level, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s", force=True
+        level=level,
+        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+        stream=stream,
+        force=True,
     )
     # aiogram logs whole updates (that is: users' messages) at DEBUG. Never do that.
     logging.getLogger("aiogram.event").setLevel(max(logging.INFO, logging.getLogger().level))

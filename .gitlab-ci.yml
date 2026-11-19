@@ -19,3 +19,4 @@ check:
     - uv run ruff check src tests
     - uv run ruff format --check src tests
     - uv run pytest
+    - TEST_LAZY_AIOGRAM=1 uv run pytest -q  # aiogram as in the Worker

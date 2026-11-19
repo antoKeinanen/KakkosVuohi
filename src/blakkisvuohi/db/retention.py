@@ -8,7 +8,7 @@ from collections.abc import Callable
 
 from .database import Database
 from .drinks import DrinkRepository
-from .models import PurgeReport, RetentionPolicy
+from .models import PurgeReport, RetentionPolicy, day_number
 from .users import UserRepository
 from .vault import Vault
 
@@ -43,6 +43,7 @@ class Purger:
         * deletes the drinks older than the retention period
         * deletes the accounts that have not been used for that long
         * removes leftovers: data without a key (it cannot be read by anyone) and keys without data
+          (unless the key was taken into use since yesterday: the data may be on its way)
         * rewrites the database files, so that no trace of deleted rows is left in them
         """
         started = time.monotonic()
@@ -60,9 +61,11 @@ class Purger:
         for user_id in data_ids - key_ids:
             await self._users.remove_row(user_id)
             report.orphans_removed += 1
+        # A key without data may belong to somebody who is signing up right now: the key is
+        # created a moment before the data. Keys taken into use today or yesterday stay.
         for user_id in key_ids - data_ids:
-            await self._vault.destroy(user_id)
-            report.orphans_removed += 1
+            if await self._vault.destroy_unclaimed(user_id, day_number(now) - 1):
+                report.orphans_removed += 1
 
         stale_before = self._policy.account_cutoff_day(now)
         async for account in self._users.scan():

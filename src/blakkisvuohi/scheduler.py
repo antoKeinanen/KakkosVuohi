@@ -39,6 +39,19 @@ async def purge_if_due(store: Store, clock: Callable[[], float] = time.time) -> 
     return None
 
 
+async def purge_on_schedule(
+    store: Store, hour: int, tz: tzinfo, clock: Callable[[], float] = time.time
+) -> PurgeReport | None:
+    """
+    For an hourly Cron Trigger (Workers): the daily purge at `hour`:00 local time, and a catch up
+    when the last purge is more than a day old (it failed, or the hour was missed). Runs every hour
+    rather than once a day in UTC, so that the local hour does not move with daylight saving.
+    """
+    if dt.fromtimestamp(clock(), tz).hour == hour:
+        return await store.purge()
+    return await purge_if_due(store, clock)
+
+
 async def purge_forever(
     store: Store,
     hour: int,

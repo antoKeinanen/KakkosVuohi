@@ -59,6 +59,11 @@ KEY_MIGRATIONS: list[str] = [
         wrapped_key TEXT NOT NULL
     ) STRICT;
     """,
+    # The day a key was last taken into use. A key is created a moment before the data of
+    # somebody signing up: the purge only destroys keys without data that nobody took recently.
+    """
+    ALTER TABLE user_keys ADD COLUMN claimed_day INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 
@@ -159,6 +164,12 @@ class Database(_Queries):
                     if self._conn.in_transaction:
                         await self._conn.execute("ROLLBACK")
                     raise
+
+    async def setup(self, statements: Sequence[str]) -> None:
+        """Idempotent DDL, see D1Database.setup (only the tests use it on SQLite)."""
+        async with self._lock:
+            for sql in statements:
+                await self._conn.execute(sql)
 
     async def close(self) -> None:
         async with self._lock:

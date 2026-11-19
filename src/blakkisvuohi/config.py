@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Literal
@@ -16,7 +17,8 @@ _WEBHOOK_SECRET_RE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
 def _secrets_dir() -> str | None:
     """Docker/Kubernetes secrets: a file /run/secrets/secret_key etc. works as the variable."""
     path = Path("/run/secrets")
-    return str(path) if path.is_dir() else None
+    # A host's own /run/secrets (e.g. sops-nix on NixOS) is not readable by the user: skip it
+    return str(path) if path.is_dir() and os.access(path, os.R_OK | os.X_OK) else None
 
 
 class Settings(BaseSettings):
@@ -44,7 +46,10 @@ class Settings(BaseSettings):
     timezone: str = "Europe/Helsinki"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
-    bot_mode: Literal["polling", "webhook"] = "polling"
+    # worker: on Cloudflare Workers (worker.py). The webhook is registered with POST /setup-webhook.
+    bot_mode: Literal["polling", "webhook", "worker"] = "polling"
+    # Worker only: another Bot API server, e.g. a local fake one for testing
+    telegram_api_url: str | None = None
     # Webhook mode only: public https base url, e.g. https://blakkis.example.com
     webhook_url: str | None = None
     webhook_secret: SecretStr | None = None
@@ -81,10 +86,14 @@ class Settings(BaseSettings):
         if self.bot_mode == "webhook":
             if not self.webhook_url or not self.webhook_url.startswith("https://"):
                 raise ValueError("WEBHOOK_URL (https) is required in webhook mode")
+        if self.telegram_api_url and self.bot_mode != "worker":
+            raise ValueError("TELEGRAM_API_URL is only used on Cloudflare Workers")
+        if self.bot_mode in ("webhook", "worker"):
             secret = self.webhook_secret.get_secret_value() if self.webhook_secret else ""
             if not _WEBHOOK_SECRET_RE.match(secret):
                 raise ValueError(
-                    "WEBHOOK_SECRET is required in webhook mode: 16-256 characters of A-Z a-z 0-9 _ -"
+                    f"WEBHOOK_SECRET is required in {self.bot_mode} mode: "
+                    "16-256 characters of A-Z a-z 0-9 _ -"
                 )
         return self
 

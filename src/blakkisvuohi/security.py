@@ -100,6 +100,7 @@ class Crypto:
         self._pseudonym_key = _derive(secret, "pseudonym")
         self._wrap = AESGCM(_derive(secret, "key-wrap"))
         self._webhook_key = _derive(secret, "webhook-path")
+        self._conversation_key = DataKey(_derive(secret, "conversations"))
 
     # -- pseudonymous identifiers -------------------------------------------------------------
 
@@ -113,6 +114,16 @@ class Crypto:
 
     def group_id(self, telegram_chat_id: int) -> str:
         return self._pseudonym("group", telegram_chat_id)
+
+    def conversation_id(self, parts: str) -> str:
+        """Pseudonym of a conversation (bot, chat, user...), see conversations.py."""
+        message = f"conversation:{parts}".encode()
+        return hmac.new(self._pseudonym_key, message, hashlib.sha256).hexdigest()
+
+    @property
+    def conversation_key(self) -> DataKey:
+        """Seals stored conversation state, which is short lived and not tied to an account."""
+        return self._conversation_key
 
     def key_check(self) -> str:
         """Stored in the databases to detect a changed SECRET_KEY at startup."""

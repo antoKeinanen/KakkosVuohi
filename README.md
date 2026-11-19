@@ -46,7 +46,7 @@ All settings are environment variables (or in `.env`, or secret files in `/run/s
 | `ADMIN_ID` | Telegram id of the admin. Admin commands are disabled without it |
 | `TIMEZONE` | Times in messages and the purge hour, default `Europe/Helsinki` |
 | `LOG_LEVEL` | `DEBUG` `INFO` `WARNING` `ERROR` |
-| `BOT_MODE` | `polling` (default) or `webhook` |
+| `BOT_MODE` | `polling` (default) or `webhook` (`worker` on Cloudflare Workers, set automatically) |
 | `WEBHOOK_URL`, `WEBHOOK_SECRET`, `HOST`, `PORT` | webhook mode only |
 
 ### Webhook mode
@@ -54,6 +54,35 @@ All settings are environment variables (or in `.env`, or secret files in `/run/s
 Put the bot behind an HTTPS reverse proxy, set `BOT_MODE=webhook`, `WEBHOOK_URL=https://…` and a random `WEBHOOK_SECRET`. The bot registers the webhook itself on startup. Telegram sends the secret with every update (`X-Telegram-Bot-Api-Secret-Token`) and requests without it are rejected with 401. `GET /healthz` can be used as a health check.
 
 Webhook mode is not meant for hosts with an ephemeral filesystem such as Heroku. Use a VPS or a platform with persistent volumes.
+
+### Cloudflare Workers
+
+The same code also runs serverless, as a Python Worker (`src/worker.py`, `wrangler.jsonc`) with **D1** as the two databases. Everything is in the devenv (`devenv shell`, then `pnpm install`).
+
+**Which plan.** The **Workers Paid** plan runs everything. On the free plan (measured on a temporary free account), the bot deploys and ordinary updates went through, at about 15-25 ms of CPU, and about 0.5 s in a fresh isolate; that is more than the nominal 10 ms, and the platform let it pass. `/kuvaaja` does not work there: drawing a chart takes about 2 s of CPU (matplotlib), and the platform stops the request. The free plan also has 5 Cron Triggers per account (the purge needs one) and 10 D1 databases (the bot needs two).
+
+```sh
+pnpm exec wrangler d1 create kakkosvuohi-data      # put both ids into wrangler.jsonc
+pnpm exec wrangler d1 create kakkosvuohi-keys
+pnpm exec wrangler secret put BOT_TOKEN            # and SECRET_KEY, WEBHOOK_SECRET
+pnpm run deploy                                    # not `pnpm deploy`: that is pnpm's own command
+curl -X POST -H "Authorization: Bearer $WEBHOOK_SECRET" https://kakkosvuohi.<you>.workers.dev/setup-webhook
+```
+
+The other settings are `vars` in `wrangler.jsonc`. The last command registers the webhook (`BOT_MODE` is `worker`; no `WEBHOOK_URL` is needed). The databases create their tables on the first request.
+
+How it differs from the long running bot:
+
+* Telegram sends **one update at a time** (`max_connections=1`), and a request returns when its update has been handled. Updates are handled in order, as before, and **at most once**: Telegram sends an update again when a request failed or was too slow, and the Worker skips it (no second drink, and an update that crashes the Worker cannot block the ones after it). The ids of handled updates are kept for two days.
+* D1 has no interactive transactions. A transaction reads directly and writes everything in one atomic batch at the end; if anything else wrote in the meantime, nothing is written and the user gets the usual error message (`db/d1.py`). With one update at a time this only happens if the purge runs at the same moment.
+* Conversation state (a half-finished `/juoma`, the `/start` menu) is kept in the data database, not in memory (`conversations.py`): under a pseudonymous id, sealed with the user's own key, so that deleting the account shreds it too. Somebody who is signing up has no key yet; what they have typed so far (weight, height, gender) is sealed with a key derived from `SECRET_KEY`. After the daily purge the Worker ends conversations that have not moved for two days. This table, and the one of handled updates, belong to the Worker: the SQLite databases of the long running bot do not have them.
+* Invocation logs are off (`wrangler.jsonc`): they would record the secret webhook path.
+* Two Cloudflare limits shape the build. An isolate may use 128 MB, also when it starts: aiogram builds the validators of all of its several hundred models when it is imported, which alone takes about 77 MiB, so the Worker imports it with `workers/lazy_models.py`, and each model is built when it is first used (the heap is then about 75 MiB instead of 130). A Worker may be 64 MiB together with its startup snapshot: `pnpm run deploy` removes what is never used from the vendored packages after `pywrangler sync` (`scripts/prune_worker_bundle.py`: matplotlib's unused fonts and GUI backends, most of fontTools, parts of numpy), which leaves about 45 MiB.
+* The purge is an hourly Cron Trigger: it runs at `PURGE_HOUR` local time, or catches up when the last one is more than a day old. `/admin_purge` works as before.
+* The rate limit is per isolate, so it is weaker.
+* For local testing, `pnpm dev` runs the Worker with local D1 databases; put the secrets in `.dev.vars`. `TELEGRAM_API_URL` points the bot at another Bot API server, e.g. a fake one.
+
+The security model changes in two places, see [Security](#security): D1 cannot be vacuumed, and it keeps restorable history.
 
 ## Security
 
@@ -77,7 +106,9 @@ The bot keeps little personal data (a nickname, weight, height, gender, the drin
 
 ### 3. The daily purge
 
-At `PURGE_HOUR` (noon by default, in `TIMEZONE`) the bot deletes expired drinks and accounts, removes leftovers (data without a key, keys without data), and rewrites both database files so that no trace of deleted rows is left (`secure_delete`, WAL checkpoint, `VACUUM`). If the bot was down at noon, it purges at startup instead. `/admin_purge` runs it on demand. The same rules are applied when reading, so data past the retention period is ignored even if a purge has failed.
+At `PURGE_HOUR` (noon by default, in `TIMEZONE`) the bot deletes expired drinks and accounts, removes leftovers (data without a key; keys without data, unless the key was taken into use since yesterday: the key of somebody signing up exists a moment before their data), and rewrites both database files so that no trace of deleted rows is left (`secure_delete`, WAL checkpoint, `VACUUM`). If the bot was down at noon, it purges at startup instead. `/admin_purge` runs it on demand. The same rules are applied when reading, so data past the retention period is ignored even if a purge has failed.
+
+**On Cloudflare Workers (D1)** two of these guarantees are weaker. D1 manages its own storage: there is no `secure_delete`, checkpoint or `VACUUM`. And D1 [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) always keeps 30 days of history (7 on the free plan) that the Cloudflare account can restore, for both databases. A deleted account is therefore not crypto-shredded until that history has expired: whoever controls the Cloudflare account (or Cloudflare) can bring it back for 30 days. Deleted data is still never read by the bot. Unfinished sign ups are the one thing sealed with a key derived from `SECRET_KEY` alone: a copy of the data database together with `SECRET_KEY` reveals what was typed into sign ups of the last two days (or of the D1 history).
 
 ### What a leak gives away
 
@@ -127,6 +158,10 @@ Users can download everything stored about them with `/data` and delete it from 
 
 ## Development
 
+With [devenv](https://devenv.sh), `devenv shell` gives Python 3.14 + uv (the venv is synced on entry) and, for Cloudflare Workers, Node 24 + pnpm (`pnpm install` gets wrangler; pywrangler is in the uv dev dependencies). `devenv test` runs the tests and ruff and checks wrangler. On NixOS, the `workerd` binary that wrangler installs from npm needs `programs.nix-ld.enable`.
+
+Every test that uses a store runs twice: on the SQLite files and on D1 (faked with SQLite in `tests/fake_d1.py`, which binds numbers as REAL, as D1 does). `TEST_LAZY_AIOGRAM=1 uv run pytest` runs the tests with aiogram imported as in the Worker; CI does both.
+
 ```sh
 uv sync                  # creates .venv with everything
 uv run pytest            # tests
@@ -144,10 +179,13 @@ src/blakkisvuohi/
   security.py       pseudonyms, per-user keys, sealing and wrapping
   scheduler.py      the daily purge
   alcomath.py       the Widmark based math
-  db/               the two SQLite databases
+  db/               the two databases
     codec.py          the encrypted layout (the only place that knows it)
     vault.py          the users' keys          users.py drinks.py groups.py stats.py  repositories
-    retention.py      the purge                database.py  connections, migrations
+    retention.py      the purge                database.py  SQLite connections, migrations
+    d1.py             the same on D1
+  conversations.py  conversation state in the database (Workers)
+  workers/          running on Cloudflare Workers; the entry point is src/worker.py
   handlers/         commands (one module per area); access rules are flags on the handlers
   menu/             the /start inline keyboard menu: engine.py (generic) and tree.py (the screens)
   middlewares.py    rate limit, access control, activity, announcements
